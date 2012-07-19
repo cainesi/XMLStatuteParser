@@ -1,5 +1,6 @@
 import HTMLParser, re
 import Constants, SectionLabelLib
+from csv import reader
 """code to parse an (english) XML statute obtained from the justice department website"""
 
 #To do list:
@@ -25,13 +26,16 @@ defPat = re.compile("\{(?P<english>[^}]*)\}\{(?P<french>[^}]*)\}$")
 def parseCodeParam(code):
     """parses the "code" parameters used in XML statutes into a list of 2-types (level, value)"""
     levelList = []
-    codeItems = code.split(",")
+    #codeItems = code.split(",")
+    codeItems = reader([code]).next() #uses CSV module to split line by commas outside quotes -- problem: doesn't work with unicode
+    #print code
     for item in codeItems:
         l = item.split("=")
         if len(l) != 2: raise XMLStatException("Equals Problem: " + str((code,item,l)))
         level = l[0]
         val = l[1]
-        lval = val.split("&quot;")
+        #lval = val.split("&quot;") #if quotes are un-escaped
+        lval = val.split("\"") #if quotes are escaped -- codes in attributes are apparently automaticall un-escaped
         if len(lval) != 3 or lval[0] != "" or lval[2] != "": raise XMLStatException("Value Problem: " + str((code,item,lval)))
         value = lval[1]
         if level == "df":
@@ -42,13 +46,20 @@ def parseCodeParam(code):
         pass
     return levelList
 
+def indentString(s):
+    return " " + s.replace("\n", "\n ")
+
 #objects for the in-memory tree representation of the xml file
 class Node(object):
     def __init__(self, tag, attrs, rawText):
         self.tag = tag
         self.attrs = attrs
         self.labels = None
-        if "code" in self.attrs: self.labels = parseCodeParam(self.attrs["code"])
+        if "code" in self.attrs:
+            #print self.attrs
+            self.labels = parseCodeParam(self.attrs["code"])
+            #print self.labels
+            pass
         self.rawText = rawText #the text used -- so we can reconstruct the initial html structure with minimal changes
         self.children = []
         return
@@ -75,11 +86,15 @@ class Node(object):
         return "[Node: " + self.tag + "]"
     def getTag(self):
         return self.tag
-    def getHTML(self):
+    def getXML(self):
         """Returns HTML representation of object"""
         #TODO: check how this interacts with startend tags
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
-        return self.rawText + "".join(c.getHTML() for c in self.children) + ("</" + self.tag + ">" if self.rawText[-2] != "/" else "")
+        return self.rawText + "".join(c.getXML() for c in self.children) + ("</" + self.tag + ">" if self.rawText[-2] != "/" else "")
+    def getPrettyXML(self):
+        if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
+        return self.rawText + ("\n" if len(self.children)>0 else "") + "\n".join(indentString(c.getPrettyXML()) for c in self.children)+ ("\n</" + self.tag + ">" if self.rawText[-2] != "/" else "")
+        return
     def getRawText(self):
         """Returns the plain text contents of the Node (and any subnodes)."""
         return "".join(c.getRawText() for c in self.children)
@@ -95,10 +110,9 @@ class BaseNode(Node):
     def __init__(self):
         Node.__init__(self,"","",None)
         return
-    def getHTML(self):
-        return "".join(c.getHTML() for c in self.children)
-    def baseStr(self):
-        return "[Base node]"
+    def getXML(self): return "".join(c.getXML() for c in self.children)
+    def getPrettyXML(self): return "".join(c.getPrettyXML() for c in self.children)
+    def baseStr(self): return "[Base node]"
 
 class TextNode(object):
     """A class to represent information other than tags included in an XML file.  I.e., all the raw text."""
@@ -109,9 +123,10 @@ class TextNode(object):
         return
     def __str__(self): return "[Textnode: " + self.text + "]"
     def baseStr(self): return "[Textnode: " + self.text[:40].__repr__() + "]"
-    def getHTML(self): 
+    def getXML(self): 
         if self.original != None: return self.original
         return self.text
+    def getPrettyXML(self): return self.getXML()
     def getRawText(self): return self.text
     pass
         
@@ -122,16 +137,17 @@ class PINode(object):
         return
     def __str__(self): return "[PI: " + self.getHTML() + "]"
     def baseStr(self): return "[PI]"
-    def getHTML(self): return "<?" + self.data +">"
+    def getXML(self): return "<?" + self.data +">"
 
 
 class XMLStatuteParser(HTMLParser.HTMLParser):
     """Object to parse the Statute XML file into a structure of nested dictionaries."""
-    def __init__(self):
+    def __init__(self, data=None):
         HTMLParser.HTMLParser.__init__(self)
         #setup the parser
         self.tree = BaseNode() #base of the tree object
         self.stack = [self.tree] #stack of Node objects leading to the Node to which the next object should be added
+        if data != None: self.feed(data)
         return
     def reset(self):
         HTMLParser.HTMLParser.reset(self)
@@ -143,6 +159,11 @@ class XMLStatuteParser(HTMLParser.HTMLParser):
         (In particular, the internal workings of the parser can sometimes cause a cast to unicode, which fails if the data contains non-ASCII characters.  See http://bugs.python.org/issue3932)."""
         HTMLParser.HTMLParser.feed(self,data.decode("utf-8"))
         return
+    def inBody(self):
+        for c in self.stack:
+            if c.tag == "body": return True
+            pass
+        return False
     def handle_starttag(self,tag,attrs):
         rawText = self.get_starttag_text()
         newNode = Node(tag, attrsToDict(attrs), rawText)
@@ -184,21 +205,23 @@ class XMLStatuteParser(HTMLParser.HTMLParser):
     
 class ActPruner(HTMLParser.HTMLParser):
     """Prunes an xml Act object, so that it only contains the section indicated by the provided label list (corresponding to output of the codeParse method) and the "identification" section.  It does this by keeping track of which tags in the stack have already been written out.  When a new tag is added, a check is done of whether it is one that should be written.  If so, then that tag, and any as yet unwritten tags on the stack, are all added to the tree at once."""
-    def __init__(self, labels):
+    def __init__(self, labels,data=None):
         HTMLParser.HTMLParser.__init__(self)
         #setup the parser
         self.tree = BaseNode() #base of the tree object
-        self.tree.writable=False
+        self.tree.forceAddToTree=False
         self.tree.isWritten=True
         self.stack = [self.tree] #stack of Node objects leading to the Node to which the next object should be added        
         self.labels = labels
+        if data != None: self.feed(data)
         return
     def feed(self,data):
         """Converts input string to unicode, to avoid internal problems with HTMLParser.
         (In particular, the internal workings of the parser can sometimes cause a cast to unicode, which fails if the data contains non-ASCII characters.  See http://bugs.python.org/issue3932)."""
         HTMLParser.HTMLParser.feed(self,data.decode("utf-8"))
         return
-    def checkWritable(self,node):
+    def checkForceAddToTree(self,node):
+        """Checks whether the Node at top of stack is one that should force writing to the tree for itself, sub-nodes and containing nodes."""
         if node.tag == "identification": return True
         elif node.labels == None: return False
         else:
@@ -207,29 +230,29 @@ class ActPruner(HTMLParser.HTMLParser):
                 if node.labels[n] != self.labels[n]: return False
             return True
             pass
-    def writable(self):
-        """Return true if the node at the top of the stack is one that should be written in the final structure."""
+    def forceAddToTree(self):
+        """Return True if the node at the top of the stack is one that should be written in the final structure (because it or a parent has forceAddToTree set."""
         for c in self.stack:
-            if c.writable: return True
+            if c.forceAddToTree: return True
         return False
     def flushStack(self):
         """Adds all currently un-added nodes from the stack to the self.tree structure, and marks them as written."""
-        #check if top of the stack is writable, and if so flush everything to the tree.
-        if self.writable():
-            #TODO
+        #check if top of the stack is forceAddToTree, and if so flush everything to the tree.
+        if self.forceAddToTree():
             for n in xrange(len(self.stack)-1,-1,-1):
                 if self.stack[n].isWritten: return #return once we've found something already written
-                #TODO -- handle the adding of object to tree structure
+                self.stack[n].isWritten = True #mark node as written, and add to the stack element above --- this will eventually add the chain onto the stack.
+                self.stack[n-1].addChild(self.stack[n])
             pass
         return
-    
     def handle_starttag(self,tag,attrs):
         rawText = self.get_starttag_text()
         newNode = Node(tag, attrsToDict(attrs), rawText)
         newNode.isWritten = False #whether Node has been written
-        newNode.writable = self.checkWritable(newNode) #whether presence of node forces writing
+        newNode.forceAddToTree = self.checkForceAddToTree(newNode) #whether presence of node forces writing
         #self.stack[-1].addChild(newNode)
         self.stack.append(newNode)
+        self.flushStack() #add any required Nodes to the tree
         return
     def handle_endtag(self,tag):
         while self.stack[-1].getTag() != tag: self.stack.pop() #implicitly code any open tags that do not match the one being closed
@@ -241,7 +264,7 @@ class ActPruner(HTMLParser.HTMLParser):
         return
     def handle_data(self,data, original = None):
         newNode = TextNode(data, original)
-        if self.writable(): self.stack[-1].addChild(newNode)
+        if self.forceAddToTree(): self.stack[-1].addChild(newNode)
         return
     def handle_entityref(self,name):
         #handle certain entities by converting them into plain ascii text
@@ -252,9 +275,10 @@ class ActPruner(HTMLParser.HTMLParser):
             print "[NOTICE Entity Reference: %s]" %name #report that we are seeing an entity reference that is not handled
         return
     def handle_charref(self,name):
-        original = "&#" + name ";"
+        original = "&#" + name + ";"
         if False:
             #handle char refs that are converted
+            pass
         else:
             self.handle_data(original)
             print "[NOTICE Char Reference: %s]" %name
@@ -270,8 +294,10 @@ class ActPruner(HTMLParser.HTMLParser):
         return
     def getTree(self):
         return self.tree
-    def getPrunedData(self):
+    def getPrunedXML(self):
         return self.tree.getHTML()
+    def getPrunedPrettyXML(self):
+        return self.tree.getPrettyXML()
     pass
 
 #testing code
