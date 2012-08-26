@@ -1,6 +1,9 @@
 import HTMLParser, re
 import Constants, SectionLabelLib
 from csv import reader
+
+#code to interfact with external C-code library
+
 """code to parse an (english) XML statute obtained from the justice department website"""
 
 #To do list:
@@ -24,9 +27,10 @@ def attrsToDict(attrs):
 #se=&quot;2&quot;,ss=&quot;1&quot;,df=&quot;{producer organization}{association de producteurs}&quot;    
 defPat = re.compile("\{(?P<english>[^}]*)\}\{(?P<french>[^}]*)\}$")
 def parseCodeParam(code):
-    """parses the "code" parameters used in XML statutes into a list of 2-types (level, value)"""
+    """parses a (unicode) "code" parameters used in XML statutes into a list of 2-types (level, value)"""
     levelList = []
     #codeItems = code.split(",")
+    print code.__repr__()
     codeItems = reader([code]).next() #uses CSV module to split line by commas outside quotes -- problem: doesn't work with unicode
     #print code
     for item in codeItems:

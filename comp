@@ -1,2 +1,2 @@
 #gcc -DUSE_CHAR -shared -O3 -o bline.so bline.c
-gcc -shared -O3 -o xmlstat.so lineparse.c
+gcc -shared -O3 -o xsutil.so xsutil.c
