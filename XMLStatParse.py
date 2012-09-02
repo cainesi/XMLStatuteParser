@@ -1,13 +1,14 @@
 import HTMLParser, re
 import Constants, SectionLabelLib
-from csv import reader
+import xsutil
 
 #code to interfact with external C-code library
 
 """code to parse an (english) XML statute obtained from the justice department website"""
 
+
+
 #To do list:
-# finish the pruning code
 # handle the sections
 
 # -- when doing this we probably don't need the dynamic-programming labelling system, as we can infer labelling from the XML tagging
@@ -27,12 +28,12 @@ def attrsToDict(attrs):
 #se=&quot;2&quot;,ss=&quot;1&quot;,df=&quot;{producer organization}{association de producteurs}&quot;    
 defPat = re.compile("\{(?P<english>[^}]*)\}\{(?P<french>[^}]*)\}$")
 def parseCodeParam(code):
-    """parses a (unicode) "code" parameters used in XML statutes into a list of 2-types (level, value)"""
+    """Parses a (unicode) "code" parameters used in XML statutes into a list of 2-types (level, value).
+    Code assuems that any special html-encoded characters in the string have already been unescaped to unicode."""
     levelList = []
-    #codeItems = code.split(",")
-    print code.__repr__()
-    codeItems = reader([code]).next() #uses CSV module to split line by commas outside quotes -- problem: doesn't work with unicode
-    #print code
+    #print code.__repr__()
+    codeItems = xsutil.commaSplit(code)
+    #print codeItems
     for item in codeItems:
         l = item.split("=")
         if len(l) != 2: raise XMLStatException("Equals Problem: " + str((code,item,l)))
@@ -48,9 +49,11 @@ def parseCodeParam(code):
             value = m.group("english")
         levelList.append((level, value))
         pass
+    #print levelList
     return levelList
 
 def indentString(s):
+    """Indents every (\\n-separated) line of a string by one space."""
     return " " + s.replace("\n", "\n ")
 
 #objects for the in-memory tree representation of the xml file
@@ -58,13 +61,13 @@ class Node(object):
     def __init__(self, tag, attrs, rawText):
         self.tag = tag
         self.attrs = attrs
-        self.labels = None
-        if "code" in self.attrs:
-            #print self.attrs
-            self.labels = parseCodeParam(self.attrs["code"])
-            #print self.labels
-            pass
-        self.rawText = rawText #the text used -- so we can reconstruct the initial html structure with minimal changes
+        self.labels = None #the raw list of label tuples
+        if "code" in self.attrs: self.labels = parseCodeParam(self.attrs["code"])
+        else: self.labels = None
+        if self.labels == None: self.sectionLabel = None #the section label object
+        else: self.sectionLabel = self.labels #TODO: sectionLabel should be a SectionLabel object
+        
+        self.rawText = rawText #the text used -- so we can reconstruct the initial xml structure with minimal changes
         self.children = []
         return
     def __len__(self): return len(self.children)
@@ -86,28 +89,46 @@ class Node(object):
         return "\n".join(l)
     def __repr__(self):
         return "<" + self.baseStr() + ">"
+    def __iter__(self):
+        """Return an iterator over the *children* of this node."""
+        return self.children.__iter__()
+    def treeWalk(self):
+        """Returns an iterator over a depth-first walk of the items under this node."""
+        for child in self.children:
+            yield child
+            for c in child.treeWalk():
+                yield c
+            pass
+        return
     def baseStr(self):
         return "[Node: " + self.tag + "]"
     def getTag(self):
         return self.tag
     def getXML(self):
-        """Returns HTML representation of object"""
+        """Returns XML representation of Node.
+        This consists of the Node's tag's rawText, plus the xml of children, plus (if the tag was not a startend tag) the closing tag text."""
         #TODO: check how this interacts with startend tags
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
         return self.rawText + "".join(c.getXML() for c in self.children) + ("</" + self.tag + ">" if self.rawText[-2] != "/" else "")
     def getPrettyXML(self):
+        """Similar to getXML, but includes newlines and indentation in xml output, to make it easier to read."""
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
         return self.rawText + ("\n" if len(self.children)>0 else "") + "\n".join(indentString(c.getPrettyXML()) for c in self.children)+ ("\n</" + self.tag + ">" if self.rawText[-2] != "/" else "")
         return
-    def getRawText(self):
-        """Returns the plain text contents of the Node (and any subnodes)."""
-        return "".join(c.getRawText() for c in self.children)
     def addChild(self,node):
         """Add a child node to this Node."""
         self.children.append(node)
         return
+    def getRawText(self):
+        """Returns the plain text contents of the Node (and any subnodes)."""
+        return "".join(c.getRawText() for c in self.children)
+    def englishMarginalText(self):
+        """Returns the subtext of this node included in DefinedTermEn tags, otherwise returns None."""
+        if self.tag != "marginalnote": raise XMLStatException("Can only call englishMarginalText on MarginalNote items. [" + self.__repr__() + "]")
+        for i in self:
+            if i.tag == "definedtermen": return i.getRawText()
+        return None
     pass
-    
     
 class BaseNode(Node):
     """Class for the top-level object in XML tree structure.  The parser seeds its tree with one of these."""
@@ -118,20 +139,27 @@ class BaseNode(Node):
     def getPrettyXML(self): return "".join(c.getPrettyXML() for c in self.children)
     def baseStr(self): return "[Base node]"
 
-class TextNode(object):
+class TextNode(Node):
     """A class to represent information other than tags included in an XML file.  I.e., all the raw text."""
     def __init__(self,text,original = None):
         """text is the unicode text that should be output in other contexts.  original is the original text used used in the node, where different (e.g., if originally escaped characters have been converted)."""
+        if original != None: Node.__init__(self, {}, original)
+        else: Node.__init__(self,"",{}, text)
         self.text = text
         self.original = original
         return
     def __str__(self): return "[Textnode: " + self.text + "]"
+    def __repr__(self): return "<" + self.baseStr() + ">"
+    def __len__(self): return 0
+    def __getitem__(self,n): raise XMLStatException("TextNode does not have subitems.")
+    def __iter__(self): raise XMLStatException("Cannot iterate over subitems of TextNode.")
     def baseStr(self): return "[Textnode: " + self.text[:40].__repr__() + "]"
-    def getXML(self): 
+    def getXML(self):
         if self.original != None: return self.original
         return self.text
     def getPrettyXML(self): return self.getXML()
     def getRawText(self): return self.text
+    def addChild(self,node): raise XMLStatException("Cannot add children to TextNode.")
     pass
         
 class PINode(object):
@@ -142,7 +170,7 @@ class PINode(object):
     def __str__(self): return "[PI: " + self.getHTML() + "]"
     def baseStr(self): return "[PI]"
     def getXML(self): return "<?" + self.data +">"
-
+    pass
 
 class XMLStatuteParser(HTMLParser.HTMLParser):
     """Object to parse the Statute XML file into a structure of nested dictionaries."""
@@ -159,8 +187,8 @@ class XMLStatuteParser(HTMLParser.HTMLParser):
         self.stack = [self.tree]
         return
     def feed(self,data):
-        """Converts input string to unicode, to avoid internal problems with HTMLParser.
-        (In particular, the internal workings of the parser can sometimes cause a cast to unicode, which fails if the data contains non-ASCII characters.  See http://bugs.python.org/issue3932)."""
+        """Decodes the input string to unicode, assuming it is UTF-8, to avoid internal problems with HTMLParser.
+        (In particular, the internal workings of the parser can sometimes cause a straight cast to unicode, which fails if the data contains non-ASCII characters.  See http://bugs.python.org/issue3932)."""
         HTMLParser.HTMLParser.feed(self,data.decode("utf-8"))
         return
     def inBody(self):
@@ -235,7 +263,7 @@ class ActPruner(HTMLParser.HTMLParser):
             return True
             pass
     def forceAddToTree(self):
-        """Return True if the node at the top of the stack is one that should be written in the final structure (because it or a parent has forceAddToTree set."""
+        """Return True if the node at the top of the stack is one that should be written in the final structure (because it or a parent has forceAddToTree set)."""
         for c in self.stack:
             if c.forceAddToTree: return True
         return False
@@ -299,7 +327,7 @@ class ActPruner(HTMLParser.HTMLParser):
     def getTree(self):
         return self.tree
     def getPrunedXML(self):
-        return self.tree.getHTML()
+        return self.tree.getXML()
     def getPrunedPrettyXML(self):
         return self.tree.getPrettyXML()
     pass
@@ -315,9 +343,17 @@ if __name__ == "__main__":
         p = XMLStatuteParser()
         p.feed(data)
         t = p.getTree()
-    if True: #test on initial actfile
+    if False: #test on initial actfile
         p = XMLStatuteParser()
         p.feed(data)
         t = p.getTree()
+    if True: #test act pruner
+        f = file(Constants.REGFILE,"r"); data = f.read(); f.close()
+        p = ActPruner([("se","1000")])
+        p.feed(data)
+        t = p.getTree()
+        d = t.getPrettyXML()
+        print(d.encode("utf-8"))
+        #f.close()
     pass
     
