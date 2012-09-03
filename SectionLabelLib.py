@@ -1,7 +1,7 @@
 #$Id$
 #$Revision$
 #$Date$
-#$URL:"
+#$URL$
 
 import re
 
