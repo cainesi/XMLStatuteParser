@@ -29,8 +29,11 @@ class RenderContext:
     def documentEnd():
         return ""
     @staticmethod
-    def renderPlainText(level = 0):
+    def indentText(text, level = 0):
         return ""
+    @classmethod
+    def renderPlainText(classobj, text, level = 0): #for legacy code referencing renderPlainText
+        return classobj.indentText(text,level)
     @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):
         return ""
@@ -79,7 +82,7 @@ class WikiContext(RenderContext):
         """method for cleaning raw text without any formatting."""
         return text   
     @staticmethod
-    def renderPlainText(text, level = 0):
+    def indentText(text, level = 0):
         return ">" * level + " " + text
     @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):
@@ -148,7 +151,7 @@ class HTMLContext(RenderContext):
     def documentEnd():
         return "</html>"
     @staticmethod
-    def renderPlainText(text, level = 0):
+    def indentText(text, level = 0):
         return ("<div style=\"padding-left: %dem;\">"%(level*3)) + text + "</div>\n"
     @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):

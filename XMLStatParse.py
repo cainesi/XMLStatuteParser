@@ -1,5 +1,7 @@
+#$Id$
+
 import HTMLParser, re
-import Constants, SectionLabelLib
+import Constants
 import xsutil
 
 #code to interfact with external C-code library
@@ -64,8 +66,6 @@ class Node(object):
         self.labels = None #the raw list of label tuples
         if "code" in self.attrs: self.labels = parseCodeParam(self.attrs["code"])
         else: self.labels = None
-        if self.labels == None: self.sectionLabel = None #the section label object
-        else: self.sectionLabel = self.labels #TODO: sectionLabel should be a SectionLabel object
         
         self.rawText = rawText #the text used -- so we can reconstruct the initial xml structure with minimal changes
         self.children = []
@@ -120,8 +120,14 @@ class Node(object):
         self.children.append(node)
         return
     def getRawText(self):
-        """Returns the plain text contents of the Node (and any subnodes)."""
+        """Returns the plain text contents of the Node (and any subnodes), stripping leading/trailing spaces on interal text chunks.  Therefore the rawText will not necessarily have the correct spacing, since it will not have implied spaces from tags."""
         return "".join(c.getRawText() for c in self.children)
+    def getSpacedRawText(self):
+        """Returns the plain text contents of Node (and subnode), including implied spaces where a tagged piece of text is immediately next to an alphanumeric character."""
+        #TODO
+        raise XMLStatException("Need to implement getSpacedRawText")
+        return 
+        
     def englishMarginalText(self):
         """Returns the subtext of this node included in DefinedTermEn tags, otherwise returns None."""
         if self.tag != "marginalnote": raise XMLStatException("Can only call englishMarginalText on MarginalNote items. [" + self.__repr__() + "]")
@@ -131,9 +137,9 @@ class Node(object):
         for i in self:
             if i.tag == "definedtermen":
                 isEnglish = True
-                margTxt += " " + i.getRawText()
+                margTxt += " " + i.getRawText().strip()
                 addSpace = True
-            elif isinstance(i,TextNode): margTxt += (" " if addSpace else "") + i.getRawText(); addSpace = False
+            elif isinstance(i,TextNode): margTxt += (" " if addSpace else "") + i.getRawText().strip(); addSpace = False
         if isEnglish: return margTxt.strip()
         else: return None
     pass
@@ -166,7 +172,7 @@ class TextNode(Node):
         if self.original != None: return self.original
         return self.text
     def getPrettyXML(self): return self.getXML()
-    def getRawText(self): return self.text
+    def getRawText(self): return self.text.strip() #strips the leading and trailing spaces on text pieces within the raw text
     def addChild(self,node): raise XMLStatException("Cannot add children to TextNode.")
     pass
         
