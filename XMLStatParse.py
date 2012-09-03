@@ -125,9 +125,17 @@ class Node(object):
     def englishMarginalText(self):
         """Returns the subtext of this node included in DefinedTermEn tags, otherwise returns None."""
         if self.tag != "marginalnote": raise XMLStatException("Can only call englishMarginalText on MarginalNote items. [" + self.__repr__() + "]")
+        isEnglish = False
+        addSpace = False
+        margTxt = u""
         for i in self:
-            if i.tag == "definedtermen": return i.getRawText()
-        return None
+            if i.tag == "definedtermen":
+                isEnglish = True
+                margTxt += " " + i.getRawText()
+                addSpace = True
+            elif isinstance(i,TextNode): margTxt += (" " if addSpace else "") + i.getRawText(); addSpace = False
+        if isEnglish: return margTxt.strip()
+        else: return None
     pass
     
 class BaseNode(Node):

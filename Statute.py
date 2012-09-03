@@ -1,5 +1,6 @@
 import XMLStatParse
 import RenderContext
+import sys
 
 #workflow for parsing statute:
 # 1) parse xml into tree structure
@@ -22,36 +23,69 @@ import RenderContext
 #TODO: labels should be output in wikioutput.
 #TODO: correct unnecessary spaces appearing at certain points.
 #TODO: marks on Items when they should start a new paragraph
+#TODO: fix for definitions where there are multiple defined term strings
+
+STRICT = False
+def showError(s, location = None):
+    if location != None:
+        while True:
+            if hasattr(location, "getSectionLabel"):
+                s += "@<" + str(location.getSectionLabel()) + ">"
+                break
+            if not hasattr(location, parent): break
+            location = location.parent
+            pass
+        pass
+    if STRICT: raise StatuteException(s)
+    else: sys.stderr.write("WARNING: <" + s + ">\n")
 
 
 class StatuteException(Exception): pass
 sectionTypes = ["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause"]
-textTypes = ["text","continuedsectionsubsection"]
+textTypes = ["text","continuedsectionsubsection","continuedparagraph","continuedsubparagraph","continuedclause","continueddefinition", "oath" ]
 
 class BaseItem(object):
     """Superclass for all items in the statute structure, with some general purpose methods of handling section labels, etc."""
     def getSectionLevel(self): return self.parent.getSectionLevel()
     def getSectionLabel(self): return self.parent.getSectionLabel()
-    def getRenderedText(self,renderContext):
-        return "\n".join(self.getRenderedPieces(renderContext))
-    def getRenderedPieces(self, renderContext):
+    def getRenderedText(self,renderContext,skipLabel=False):
+        pieces = self.getRenderedPieces(renderContext,skipLabel=skipLabel)
+        if pieces[0] == "": pieces = pieces[1:]
+        return "\n".join(pieces)
+    def getRenderedPieces(self, renderContext, skipLabel=False):
         level = self.getSectionLevel()
-        textList = [""]
+        textList = [u""]
+        softSpace = False #space should be inserted before next merge, if leading character is alphanumeric
+        if not skipLabel:
+            txt = self.getRenderedLabel()
+            if txt != None: textList[0] += renderContext.boldText(self.getRenderedLabel())
+            softSpace = True
+            #TODO: should we make the labels just ordinary text, or is it important to handle them specially so they can be carved out when necessary?
+            pass
         for c in self.items:
             levtmp = c.getSectionLevel()
             rp = c.getRenderedPieces(renderContext)
-            if levtmp == level: #first part is continuation at same level, merge it with trailing block of text
-                textList[-1] += rp[0]
-                textList += rp[1:]
-                pass
-            else: #otherwise indent the first part of the new text
+            if levtmp != level: #if the level has changed with the next object, then we need to start new paragraph
                 textList.append(renderContext.renderPlainText(rp[0],levtmp)) #change this method to "indentText"?
                 textList += rp[1:]
                 level == levtmp
+                softSpace = False
+                pass
+            elif c.forceNewParagraph():
+                textList.append(renderContext.renderPlainText(rp[0],levtmp)) #change this method to "indentText"?
+                textList += rp[1:]
+                level == levtmp
+                softSpace = False
+            else: #make a continuation of the trailing paragraph, adding a space if necessary to separate words
+                if softSpace and len(rp[0]) > 0 and rp[0][0].isalnum(): textList[-1] += " " + rp[0]
+                else: textList[-1] += rp[0]
+                textList += rp[1:]
+                softSpace = False
                 pass
             pass
-        if textList[0] == "": textList = textList[1:]
+        #if textList[0] == "": textList = textList[1:]
         return textList
+    def forceNewParagraph(self): return False #returns True if the text of this item must start with a new paragraph
 
 class SectionItem(BaseItem):
     """Class for a section / subsection / etc."""
@@ -77,11 +111,11 @@ class SectionItem(BaseItem):
             elif child.tag == "a":
                 txt = child.getRawText().strip().lower()
                 if txt != "previous version":
-                    raise StatuteException("Unknown <a> tag: ["+txt+"]")
+                    showError("Unknown <a> tag: ["+txt+"]",location=self)
                 pass
             elif isinstance(child,XMLStatParse.TextNode): #raise an exception if we are ignoring any raw text
-                if child.getRawText().strip() != "": raise StatuteException("Text appearing directly in a section: ["+child.getRawText()+"]")
-            else: raise StatuteException("Unknown tag: [" + repr(child) + "]")
+                if child.getRawText().strip() != "": showError("Text appearing directly in a section: ["+child.getRawText()+"]",location=self)
+            else: showError("Unknown tag: [" + repr(child) + "]", location=self)
             pass
         #TODO : confirm consistency of section label code and label constructed from label strings
         pass
@@ -104,17 +138,29 @@ class SectionItem(BaseItem):
 
     def getSectionLabel(self): return self.sectionLabel
     def getSectionLevel(self): return len(self.getSectionLabel()) #TODO: there should be multiple length measures for the labels (including / not including defs, etc.)
+    def getRenderedLabel(self):
+        if self.labelString == None: return None
+        return self.labelString
+    def forceNewParagraph(self): return True #returns True if the text of this item must start with a new paragraph
 
 class DefinitionItem(SectionItem):
     """Special subclass for handling definitions.
     (By overriding extractMetaData, provides special handling for the marginal notes, which have a different format within definitions, as well as for labels, which are indicated by a definedtermen tag within the definition)."""
+    def __init__(self, parent, tree):
+        SectionItem.__init__(self,parent, tree)
+        #extract labelString from first TextItem in the definition
+        for item in self.items:
+            if isinstance(item,TextItem) and item.labelString != None: self.labelString = item.labelString; break
+            pass
+        return 
+    
     def extractMetaData(self):
         """Extract information on section label / marginal note, and returns the list of remaining subitems to be processed."""
         subsecs = [] #TODO: factor this out into a method that can be overriden for definitions
         for child in self.tree:
             if child.tag == "marginalnote":
                 tmp = child.englishMarginalText()
-                if tmp != None and self.marginalNote != None: raise StatuteException("Multiple marginal notes: [" + self.marginalNote + "][" + tmp +"]")
+                if tmp != None and self.marginalNote != None: showError("Multiple marginal notes: [" + self.marginalNote + "][" + tmp +"]",location=self)
                 self.marginalNote = tmp
             #elif child.tag == "definedtermen": self.labelString = child.getRawText()
             elif child.tag == "historicalnote": self.historicalNote = child.getRawText() #I don't think there should ever be historical notes to definition sections.
@@ -122,31 +168,31 @@ class DefinitionItem(SectionItem):
                 subsecs.append(child)
                 pass
         return subsecs
+    def getRenderedLabel(self):
+        if self.labelString == None: return None
+        return "\"" + self.labelString + "\""
     pass
 
-class DummySectionItem(SectionItem):
-    def __init__(self):
-        SectionItem.__init__(self)
-    pass
 
 class TextItem(BaseItem):
-    """Class for a blob of text, possibly with embedded links and other decorations."""
+    """Class for a blob of text, possibly with embedded links and other decorations.
+    Text inside the TextItem is stored as a linked list of Piece objects."""
     def __init__(self,parent,tree):
         self.parent = parent
         self.tree = tree
         self.labelString = None
-        self.pieces = []
+        self.pieces = [] #TODO: replace this with linked list of TextPiece objects
         self.processTree(self.tree)
         return
     
     def processTree(self,tree,stack=None):
         if stack == None: stack = [] #create stack on initial call
-        if len(stack) > 30: raise StatuteException("Stackoverflow")
+        if len(stack) > 100: raise StatuteException("Stackoverflow")
         stack.append(tree.tag)
         for item in tree: #iterate over the subitems
             if item.tag == "definedtermen":
                 if self.labelString == None: self.labelString = item.getRawText()
-                else: raise StatuteException("Found definition label where label already exists: ["+self.labelString+ "]["+item.getRawText()+"]")
+                else: showError("Found definition label where label already exists: ["+self.labelString+ "]["+item.getRawText()+"]", location = self)
             elif item.tag == "xrefexternal":
                 self.pieces.append(" ")
                 self.pieces.append(LinkItem(parent=self,text=item.getRawText(),target=None))
@@ -155,7 +201,7 @@ class TextItem(BaseItem):
                 txt = item.getRawText().strip()
                 if "text" in stack: self.pieces.append(item.getRawText().strip())
                 else:
-                    if strip != "": raise StatuteException("Unprocessed text: ["+ txt + "]["+str(stack)+"]") #if we are ignoring non-trivial text, raise an exception so we know there is more to handle.
+                    if txt != "": showError("Unprocessed text: ["+ txt + "]["+str(stack)+"]",location=self) #if we are ignoring non-trivial text, raise an exception so we know there is more to handle.
                 pass
             else:
                 self.processTree(tree=item,stack=stack) #otherwise recurse down to the contents of this item.
@@ -165,6 +211,22 @@ class TextItem(BaseItem):
     def getRenderedPieces(self, renderContext):
         #TODO: Need to do more sophisticated processing, so that different types of text can be appropriately rendered       
         return ["".join(unicode(c) for c in self.pieces)]
+    pass
+
+class Piece(object):
+    def __init__(self,parent,previousPiece=None,nextPiece=None):
+        self.parent = parent
+        self.previousPiece = previousPiece
+        self.nextPiece = nextPiece
+        return
+    #TODO: code for manipulating the linked list
+    pass
+
+class DefinedTermPiece(BaseItem):
+    pass
+
+class BoldItem(BaseItem):
+    """Item representing text that should be presented in bold --- mainly quoted defined terms."""
     pass
 
 class LinkItem(BaseItem):
@@ -285,7 +347,7 @@ class Statute(object):
     def renderPage(self,sec):
         lab = sec.labelString
         f = file("Pages/" + self.prefix + " " + lab,"w")
-        f.write(sec.getRenderedText(RenderContext.WikiContext).encode("utf-8"))
+        f.write(sec.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()
         pass    
 
