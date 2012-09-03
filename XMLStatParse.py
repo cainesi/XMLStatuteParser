@@ -113,7 +113,7 @@ class Node(object):
     def getPrettyXML(self):
         """Similar to getXML, but includes newlines and indentation in xml output, to make it easier to read."""
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
-        return self.rawText + ("\n" if len(self.children)>0 else "") + "\n".join(indentString(c.getPrettyXML()) for c in self.children)+ ("\n</" + self.tag + ">" if self.rawText[-2] != "/" else "")
+        return self.rawText + ("\n" if len(self.children)>0 else "") + "\n".join(indentString(c.getPrettyXML()) for c in self.children)+ ("\n</" + self.rawText[1:1+len(self.tag)] + ">" if self.rawText[-2] != "/" else "")
         return
     def addChild(self,node):
         """Add a child node to this Node."""
@@ -151,7 +151,7 @@ class TextNode(Node):
     """A class to represent information other than tags included in an XML file.  I.e., all the raw text."""
     def __init__(self,text,original = None):
         """text is the unicode text that should be output in other contexts.  original is the original text used used in the node, where different (e.g., if originally escaped characters have been converted)."""
-        if original != None: Node.__init__(self, {}, original)
+        if original != None: Node.__init__(self, "", {}, original)
         else: Node.__init__(self,"",{}, text)
         self.text = text
         self.original = original
