@@ -52,6 +52,14 @@ class SectionLabel:
             pass
         return True
     def __ne__(self,sl): return not self.__eq__(sl)
+    def quasiEqual(self,sl):
+        """Returns True if the last numberings are quasiEqual and the remaining numberings are actually equal.  Used for testing whether imputed section labels are being computed accurately (since impused section labels will not know what term is being defined in a definition section)"""
+        if sl == None: return False
+        if len(self) != len(sl): return False
+        if len(self) == 0: return True
+        if not self.numberings[-1].quasiEqual(sl.numberings[-1]): return False
+        if self[:-1] != sl[:-1]: return False
+        return True
     def isSuperSectionLabelOf(self,sl):
         if len(self) > len(sl): return False
         for c in range(0,len(self)):
@@ -85,6 +93,10 @@ class Numbering(object):
         if self.getLabelString() != n.getLabelString(): return False
         return True
     def __ne__(self,n): return not self.__eq__(n)
+    def quasiEqual(self,n):
+        """Returns true if actually equal or if both are definitions.  Used for verifying the consistency of imputed section labels."""
+        if self.getSectionType() == "definition" and n.getSectionType() == "definition": return True
+        else: return self == n
     def getLabelString(self): return self.labelString
     def getSectionType(self): return self.sectionType
     def getIDString(self): return "(" + self.labelString + ")"

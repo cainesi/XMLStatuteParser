@@ -6,7 +6,7 @@ import os, sys
 #fileList = ["apca.xml"] #simplest test
 #fileList = ["apca.xml","excise_act.xml"] #test more
 #fileList = os.listdir("Statutes") #full test
-fileList = ["ita13.xml"] #representative ita section
+fileList = ["apca.xml","excise_act.xml","ita13.xml","ita14.xml"] #representative ita section
 #fileList = ["ita.xml"]
 #fileList = ["excise_act.xml"]
 fileList = [c for c in fileList if c[-4:].lower() == ".xml"]

@@ -49,6 +49,8 @@ def parseCodeParam(code):
             m = defPat.match(value)
             if m == None: raise XMLStatException("Definition Problem: " + str((code,item,value)))
             value = m.group("english")
+        if u" to " in value or u" and " in value: value = value.split()[0] #fix certain tag referencing multiple sections (usually for repeals of subsections)
+        value = value.strip("()") #sometimes there are stray parentheses around the number (usually also seems to be associated with repealed provisions)
         levelList.append((level, value))
         pass
     #print levelList
