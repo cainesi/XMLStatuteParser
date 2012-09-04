@@ -47,6 +47,9 @@ class RenderContext:
     def renderHeading(text,level):
         return ""
     @staticmethod
+    def renderMarginalNote(text):
+        return ""
+    @staticmethod
     def renderTable(table):
         return ""
     @staticmethod
@@ -106,6 +109,9 @@ class WikiContext(RenderContext):
     def renderHeading(text,level):
         text = WikiContext.cleanText(text)
         return "="*level + " " + text + " " + "="*level
+    @staticmethod
+    def renderMarginalNote(text):
+        return WikiContext.renderHeading(text,5)
     @staticmethod
     def renderTable(table):
         heading = ("||~ " + " ||~ ".join(table[0]) + " ||") if len(table)>=1 else ""

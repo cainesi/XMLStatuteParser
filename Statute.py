@@ -44,62 +44,58 @@ def showError(s, location = None):
 
 class StatuteException(Exception): pass
 
+#####
+#
+# Items, which represent parts of the parsed statute structure
+#
+####
+
+class Paragraph(object):
+    """Class for encapsulating a (part of a) paragraph of rendered text, along with logic for determining when paragraphs can be connected, and outputing final results."""
+    def __init__(self,text, renderContext,indentLevel = 0,isMarginalNote = False, forceNewParagraph=False, softSpace=False):
+        self.text = text
+        self.indentLevel = indentLevel
+        self.isMarginalNote = isMarginalNote
+        self.forceNewParagraph = forceNewParagraph
+        self.softSpace = softSpace
+        self.renderContext = renderContext
+        return
+    def merge(self,nextParagraph):
+        """Attempted to merge text with the nextParagraph, returns True if successful, else False."""
+        if nextParagraph.forceNewParagraph: return False
+        if self.isMarginalNote or nextParagraph.isMarginalNote: return False #marginal notes can't be merged
+        if self.indentLevel != nextParagraph.indentLevel: return False
+        spacer = u""
+        if self.softSpace: spacer = (u" " if (len(nextParagraph.text) > 0 and nextParagraph.text[0].isalnum()) else u"")
+        else: spacer = u""
+        self.text += spacer + nextParagraph.text
+        self.softSpace = nextParagraph.softSpace
+        return True
+    def getRenderedText(self):
+        if not self.isMarginalNote:
+            return self.renderContext.indentText(self.text, level = self.indentLevel)
+        return self.renderContext.renderMarginalNote(self.text)
+
 class BaseItem(object):
     """Superclass for all items in the statute structure, with some general purpose methods of handling section labels, etc."""
-    def getSectionLevel(self): return self.parent.getSectionLevel()
+    def getIndentLevel(self): return self.parent.getIndentLevel()
     def getSectionLabel(self): return self.parent.getSectionLabel()
     def getRenderedText(self,renderContext,skipLabel=False):
         """Get the text for this item, rendered according to the provided context."""
-        pieces = self.getRenderedPieces(renderContext,skipLabel=skipLabel)
-        if pieces[0] == "": pieces = pieces[1:]
-        return "\n".join(pieces)
-    def getRenderedPieces(self, renderContext, skipLabel=False):
-        """Get list of paragraph text-blocks for this item, rendered according to the current context."""
-        level = self.getSectionLevel()
-        textList = [u""]
-        softSpace = False #space should be inserted before next merge, if leading character is alphanumeric
-        forceNewline = False #forces the next chunk added to be in a new paragraph
-        if not skipLabel:
-            labelTxt = self.getRenderedLabel()
-            if labelTxt != None:
-                textList[0] += renderContext.boldText(self.getRenderedLabel()); softSpace = True #enforce a trailing space after label
-                if self.separateLabelLine() == True: forceNewline = True #place label line on its own line (e.g., for formula)
+        paragraphs = self.getParagraphs(renderContext,skipLabel=skipLabel)
+        #merge paragraphs, where possible
+        mergedParagraphs = [paragraphs[0]]
+        for p in paragraphs[1:]:
+            if not mergedParagraphs[-1].merge(p): mergedParagraphs.append(p)
             pass
-        for c in self.items:
-            levtmp = c.getSectionLevel()
-            #get paragraph blocks for subitem and tack onto list of blocks.  The initial new block must be handled specially as it may be either (i) a continuation of the last added block or the (ii) start of a new block.  We assume we are in case (ii) if the subitem is at a different level or if the subitem forces the start of a new block
-            rp = c.getRenderedPieces(renderContext)
-            if levtmp != level: #if the level has changed with the next object, then we need to start new paragraph
-                textList.append(renderContext.renderPlainText(rp[0],levtmp)) #change this method to "indentText"?
-                textList += rp[1:]
-                level == levtmp
-                softSpace = False
-                forceNewline = False
-                pass
-            elif c.forceNewParagraph():
-                textList.append(renderContext.renderPlainText(rp[0],levtmp)) #change this method to "indentText"?
-                textList += rp[1:]
-                level == levtmp
-                softSpace = False
-                forceNewline = False
-            elif forceNewline:
-                textList.append(renderContext.renderPlainText(rp[0],levtmp)) #change this method to "indentText"?
-                textList += rp[1:]
-                level == levtmp
-                softSpace = False
-                forceNewline = False
-            else: #make a continuation of the trailing paragraph, adding a space, if necessary, to separate words
-                if softSpace and len(rp[0]) > 0 and rp[0][0].isalnum(): textList[-1] += " " + rp[0]
-                else: textList[-1] += rp[0]
-                textList += rp[1:]
-                softSpace = False
-                pass
-            pass
-        #if textList[0] == "": textList = textList[1:]
-        return textList
-    def forceNewParagraph(self): return False #returns True if the text of this item must start with a new paragraph
-    def getRenderedLabel(self): return None
-    def separateLabelLine(self): return False
+        return "\n".join(p.getRenderedText() for p in mergedParagraphs)
+    def getParagraphs(self, renderContext, skipLabel=False):
+        """Get list of paragraph text-blocks for this item, rendered according to the current context.  Gets overridden in certain subclasses to reflect different paragraph breakdown (e.g., in TextItems)"""
+        return self.subParagraphs(renderContext)
+    def getSubParagraphs(self,renderContext):
+        paragraphs = []
+        for c in self.items: paragraphs += c.getParagraphs(renderContext)
+        return paragraphs
 
 class SectionItem(BaseItem):
     """Class for a section / subsection / etc."""
@@ -171,7 +167,10 @@ class SectionItem(BaseItem):
         #create imputed SL from parent
         selfType = self.tree.tag  #derive the type of the new Numbering type to add to the label from the tag
         if selfType in formulaSectionMap: selfType = formulaSectionMap[selfType]
-        imputedSL = self.parent.getSectionLabel().addLabel(selfType, self.labelString)
+        if self.labelString != None: cleanLabel = self.labelString.strip("().")
+        else: cleanLabel = u""
+        if self.parent != None: imputedSL = self.parent.getSectionLabel().addLabel(selfType, cleanLabel)
+        else: imputedSL = SectionLabelLib.SectionLabel(labelList=[(selfType,cleanLabel)])
         
         currentSL = self.getSectionLabel()
         if currentSL != None: #compare with SL derived from the xml tag, if one exists, and show error on mismatch
@@ -186,15 +185,22 @@ class SectionItem(BaseItem):
         return self.marginalNote
     pass
 
-    def getSectionLabel(self): return self.sectionLabel
-    def getSectionLevel(self):
+    def getSectionLabel(self): return self.sectionLabel #the section label object pinpointing this provision
+    def getLabelString(self): return self.labelString #the top-level string tag labeling this provision (appearing at the start of text)
+    def getIndentLevel(self):
         sl = self.getSectionLabel()
-        if sl == None: return self.parent.getSectionLevel() #return the parent's level, if there's no section label here
+        if sl == None: return self.parent.getIndentLevel() #return the parent's level, if there's no section label here
         return sl.indentLevel()
-    def getRenderedLabel(self):
-        if self.labelString == None: return None
-        return self.labelString
-    def forceNewParagraph(self): return True #returns True if the text of this item must start with a new paragraph
+    def getParagraphs(self,renderContext, skipLabel=False):
+        #paragraphs of a section consist of the marginal note, the label and paragraphs from any subobjects
+        paragraphs = []
+        needForce = True #need to explicitly force a new paragraph on a subitem paragraph
+        if self.marginalNote != None: paragraphs.append(Paragraph(text=self.marginalNote, renderContext=renderContext, isMarginalNote=True)); needForce = False
+        if not skipLabel:
+            if self.getLabelString() != None: paragraphs.append(Paragraph(text=renderContext.boldText(self.getLabelString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel(), softSpace=True) ); needForce = False
+        paragraphs += self.getSubParagraphs(renderContext)
+        if needForce and len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True #force a new paragraphs to start if not already accomplished by label string or marginal note
+        return paragraphs
 
 class DefinitionItem(SectionItem):
     """Special subclass for handling definitions.
@@ -223,7 +229,11 @@ class DefinitionItem(SectionItem):
                 subsecs.append(child)
                 pass
         return subsecs
-    def getRenderedLabel(self): return None #definitions items shouldn't have labels
+    def getParagraphs(self,renderContext, skipLabel = False):
+        paragraphs =  self.getSubParagraphs(renderContext)
+        if len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True
+        return paragraphs
+    
     pass
 
 class FormulaItem(SectionItem):
@@ -240,7 +250,7 @@ class FormulaItem(SectionItem):
         self.handleSubsections(subsecs)
         return
     
-    def getRenderedLabel(self): return self.formulaString
+    def getFormulaString(self): return self.formulaString
     def separateLabelLine(self): return True #the "label" of the formula should be pushed to its own line (as well as starting a new paragraph)
     
     def extractMetaData(self):
@@ -260,8 +270,14 @@ class FormulaItem(SectionItem):
             pass
         return subsecs
     
-    def getSectionLevel(self): return self.parent.getSectionLevel()
+    def getIndentLevel(self): return self.parent.getIndentLevel()
     def getSectionLabel(self): return self.parent.getSectionLabel()
+    def getParagraphs(self,renderContext, skipLabel = False):
+        paragraphs = []
+        paragraphs.append(Paragraph(text=renderContext.boldText(self.getFormulaString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel()) )
+        followers = self.getSubParagraphs(renderContext)
+        if len(followers) > 0: followers[0].forceNewParagraph = True
+        return paragraphs + followers
 
 class TextItem(BaseItem):
     """Class for a blob of text, possibly with embedded links and other decorations.  Is called on nodes of the tree which just embed text, and not further subsection.
@@ -306,12 +322,29 @@ class TextItem(BaseItem):
                 self.processTree(tree=item,stack=stack) #otherwise recurse down to the contents of this item.
         stack.pop()
         return
-    
-    def getRenderedPieces(self, renderContext):
-        return ["".join(c.getText(renderContext) for c in self.firstPiece)]
+    def getParagraphs(self, renderContext):
+        pieceIterator = iter(self.firstPiece)
+        indentLevel = self.getIndentLevel()
+        paragraphs = []
+        try: #get the paragraph for the initial piece to populate list
+            firstPiece = pieceIterator.next()
+        except StopIteration:
+            return [] #there were no Pieces to iterate over, so there are no paragraphs to return
+        firstParagraph = Paragraph(text=firstPiece.getText(renderContext),renderContext=renderContext,indentLevel=indentLevel)
+        paragraphs = [firstParagraph]
+        for piece in pieceIterator:
+            nextParagraph = Paragraph(text=piece.getText(renderContext),renderContext=renderContext,indentLevel=indentLevel)
+            if not paragraphs[-1].merge(nextParagraph): paragraphs.append(nextParagraph) #either merge or add paragraph
+        return paragraphs
     def getDefinedTerms(self):
         return self.definedTerms
     pass
+
+#####
+#
+# Piece classes, used to represent the parts of text in a TextItem
+#
+####
 
 class Piece(object):
     def __init__(self,parent,previousPiece=None,nextPiece=None):
@@ -424,6 +457,12 @@ class LinkPiece(Piece):
         return True
     def eatsSpace(self): return False
     pass
+
+#####
+#
+# Various types of targets for Link Items
+#
+####
 
 class Target(object):
     """Superclass for all types of link targets."""

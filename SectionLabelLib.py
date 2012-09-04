@@ -4,6 +4,7 @@
 #$URL$
 
 import re
+import sys
 from Constants import sectionTypes, formulaSectionTypes, formulaSectionMap, textTypes, tagSection
 
 
@@ -50,6 +51,7 @@ class SectionLabel:
             if self.numberings[c] != sl.numberings[c]: return False
             pass
         return True
+    def __ne__(self,sl): return not self.__eq__(sl)
     def isSuperSectionLabelOf(self,sl):
         if len(self) > len(sl): return False
         for c in range(0,len(self)):
@@ -62,7 +64,7 @@ class SectionLabel:
     def addLabel(self,labelType,labelString):
         """Creates a new sectionLabel by appending the specified labelString."""
         newSL = SectionLabel(labelList = [(labelType,labelString)])
-        return self + addLabel
+        return self + newSL
     def getIDString(self):
         """Returns a string that can be used match against reference to sections in the text of the instrument."""
         return u"".join(n.getIDString() for n in self.numberings)
@@ -82,10 +84,11 @@ class Numbering(object):
         if self.getSectionType() != n.getSectionType(): return False
         if self.getLabelString() != n.getLabelString(): return False
         return True
+    def __ne__(self,n): return not self.__eq__(n)
     def getLabelString(self): return self.labelString
     def getSectionType(self): return self.sectionType
     def getIDString(self): return "(" + self.labelString + ")"
-    def getDisplayString(self): return u"["+ self.sectionType + u" : " + self.labelString + u"]"
+    def getDisplayString(self): return u"["+ unicode(self.sectionType) + u" : <" + unicode(self.labelString) + u">]"
     def indentIncrement(self): return 1
     def getTuple(self): return (self.sectionType, self.labelString)
     
@@ -94,6 +97,7 @@ class SectionNumbering(Numbering):
         labelString = labelString.rstrip(".") #strip trailing period off the section label string, since sections are written 4(2), not 4.(2)
         Numbering.__init__(self,sectionType,labelString)
         return
+    def getIDString(self): return self.labelString #no parentheses around section number
 class DefinitionNumbering(Numbering):
     def getIDString(self): return u"[" + self.labelString + u"]"
     def indentIncrement(self): return 0
