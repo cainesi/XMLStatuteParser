@@ -1,22 +1,9 @@
 #$Id$
 
 import HTMLParser, re
-import Constants
-import xsutil
+import xsutil #code to interfact with external C-code library
 
-#code to interfact with external C-code library
-
-"""code to parse an (english) XML statute obtained from the justice department website"""
-
-
-
-#To do list:
-# handle the sections
-
-# -- when doing this we probably don't need the dynamic-programming labelling system, as we can infer labelling from the XML tagging
-#Need code for extracting specific sections/subparts from a big XML document, so we can analyze something big like the ITA!
-#Should move this into a separate project
-
+"""The module provides code that converts an xml file representing a statute (as found in the Justice Department website) and creates an in-memory represenation of it that can be taken as input by the statute parsing code in the Statute module."""
 
 class XMLStatException(Exception):
     """Exception thrown by XML-statute parsing code."""
@@ -111,7 +98,7 @@ class Node(object):
         This consists of the Node's tag's rawText, plus the xml of children, plus (if the tag was not a startend tag) the closing tag text."""
         #TODO: check how this interacts with startend tags
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
-        return self.rawText + "".join(c.getXML() for c in self.children) + ("</" + self.tag + ">" if self.rawText[-2] != "/" else "")
+        return self.rawText + "".join(c.getXML() for c in self.children) + ("</" + self.rawText[1:1+len(self.tag)] + ">" if self.rawText[-2] != "/" else "")
     def getPrettyXML(self):
         """Similar to getXML, but includes newlines and indentation in xml output, to make it easier to read."""
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
@@ -348,28 +335,4 @@ class ActPruner(HTMLParser.HTMLParser):
         return self.tree.getPrettyXML()
     pass
 
-#testing code
-if __name__ == "__main__":
-    f = file(Constants.ACTFILE,"r"); data = f.read(); f.close()
-    if False: #test of parseCode method
-        teststr = "se=&quot;2&quot;,ss=&quot;1&quot;,df=&quot;{producer organization}{association de producteurs}&quot;"
-        print parseCode(teststr)
-    if False: #test parsing of simple xml file
-        f = file("Tests/simple_parse.xml","r"); data = f.read(); f.close()
-        p = XMLStatuteParser()
-        p.feed(data)
-        t = p.getTree()
-    if False: #test on initial actfile
-        p = XMLStatuteParser()
-        p.feed(data)
-        t = p.getTree()
-    if True: #test act pruner
-        f = file(Constants.REGFILE,"r"); data = f.read(); f.close()
-        p = ActPruner([("se","1000")])
-        p.feed(data)
-        t = p.getTree()
-        d = t.getPrettyXML()
-        print(d.encode("utf-8"))
-        #f.close()
-    pass
     
