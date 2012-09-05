@@ -33,5 +33,7 @@ knownTextTags = set(["text", #ordinary text
                      "emphasis", #italics / bold
                      "repealed", #repealed blocks
                      "sub", #subscripts
-                     "language" #foreign language (e.g., latin)
+                     "sup", #superscript
+                     "language", #foreign language (e.g., latin)
+                     "label" #appeaers in the "provision" tags in 211.1
                      ]) 

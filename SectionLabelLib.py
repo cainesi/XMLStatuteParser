@@ -60,7 +60,7 @@ class SectionLabel:
         if not self.numberings[-1].quasiEqual(sl.numberings[-1]): return False
         if self[:-1] != sl[:-1]: return False
         return True
-    def isSuperSectionLabelOf(self,sl):
+    def containsSection(self,sl):
         if len(self) > len(sl): return False
         for c in range(0,len(self)):
             if self.numberings[c] != sl.numberings[c]: return False
@@ -73,11 +73,12 @@ class SectionLabel:
         """Creates a new sectionLabel by appending the specified labelString."""
         newSL = SectionLabel(labelList = [(labelType,labelString)])
         return self + newSL
+    def __str__(self): return self.getIDString()
     def getIDString(self):
         """Returns a string that can be used match against reference to sections in the text of the instrument."""
         return u"".join(n.getIDString() for n in self.numberings)
     def getDisplayString(self):
-        """Returns a string representation fo the section label for debugging purposes."""
+        """Returns a string representation for the section label for debugging purposes."""
         return u"".join(n.getDisplayString() for n in self.numberings)
     def indentLevel(self): return sum(n.indentIncrement() for n in self.numberings)
     pass
@@ -111,7 +112,7 @@ class SectionNumbering(Numbering):
         return
     def getIDString(self): return self.labelString #no parentheses around section number
 class DefinitionNumbering(Numbering):
-    def getIDString(self): return u"[" + self.labelString + u"]"
+    def getIDString(self): return u" \"" + self.labelString + u"\" "
     def indentIncrement(self): return 0
 class FormulaNumbering(Numbering):
     def getIDString(self): return u""

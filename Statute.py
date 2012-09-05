@@ -34,6 +34,11 @@ class StatuteException(Exception): pass
 
 class BaseItem(object):
     """Superclass for all items in the statute structure, with some general purpose methods of handling section labels, etc."""
+    def __init__(self, parent, tree):
+        self.parent = parent
+        self.tree = tree
+        self.items = []
+        return
     def getIndentLevel(self): return self.parent.getIndentLevel()
     def getSectionLabel(self): return self.parent.getSectionLabel()
     def getRenderedText(self,renderContext,skipLabel=False):
@@ -47,17 +52,39 @@ class BaseItem(object):
         return "\n".join(p.getRenderedText() for p in mergedParagraphs)
     def getParagraphs(self, renderContext, skipLabel=False):
         """Get list of paragraph text-blocks for this item, rendered according to the current context.  Gets overridden in certain subclasses to reflect different paragraph breakdown (e.g., in TextItems)"""
-        return self.subParagraphs(renderContext)
+        return self.getSubParagraphs(renderContext)
     def getSubParagraphs(self,renderContext):
         paragraphs = []
         for c in self.items: paragraphs += c.getParagraphs(renderContext)
         return paragraphs
+    def extractMetaData(self):
+        """Extracts meta data from the item's tree, and returns a list of subnodes other than those providing metadata."""
+        return [item for item in self.tree]
+    def handleSubsections(self, subsecs):
+        """Handles the subsections of the section that are left over after extractMetaData has done its work.  Called by items that may have subsections."""
+        for child in subsecs:
+            if child.tag == "definition": self.items.append(DefinitionItem(parent=self,tree=child)) #this is first, so that definitions are parsed a DefinitionItems rather than generic SectionItems, despite being a sectionType
+            elif child.tag in sectionTypes: self.items.append(SectionItem(parent=self,tree=child)) #other types of section, include formuladefinition
+            elif child.tag in formulaSectionTypes: self.items.append(SectionItem(parent=self,tree=child))
+            elif child.tag == "formulagroup": self.items.append(FormulaItem(parent=self,tree=child)) #top level for a formula --- handled specially so we can extract the formula itself
+            elif child.tag == "provision": self.items.append(TextItem(parent=self,tree=child,forceNewParagraph=True)) #provision tags only appear in ITA 211.1, this provides an acceptable way of displaying them
+            elif child.tag == "readastext": self.items.append(ReadAsItem(parent=self,tree=child))
+            elif child.tag in textTypes: self.items.append(TextItem(parent=self,tree=child)) #tags that encapsulate only text
+            elif child.tag == "a":
+                txt = child.getRawText().strip().lower()
+                if txt != "previous version":
+                    showError("Unknown <a> tag: ["+txt+"]",location=self)
+                pass
+            elif isinstance(child,XMLStatParse.TextNode): #raise an exception if we are ignoring any raw text
+                if child.getRawText().strip() != "": showError("Text appearing directly in a section: ["+child.getRawText()+"]",location=self)
+            else: showError("Unknown tag: [" + repr(child) + "]", location=self)
+            pass
+        return
 
 class SectionItem(BaseItem):
     """Class for a section / subsection / etc."""
     def __init__(self, parent, tree):
-        self.parent = parent
-        self.tree = tree
+        BaseItem.__init__(self,parent,tree)
         #TODO : extract the section label code from the tree, if present
 
         if tree.labels == None: self.sectionLabel = None
@@ -73,7 +100,6 @@ class SectionItem(BaseItem):
         subsecs = self.extractMetaData() #fill in prior variables, leaving any remaining nodes to process
         self.finalizeSectionLabel() 
         #handle other subitems, which should all be types of sections or blocks of text
-        self.items = []
         self.handleSubsections(subsecs)
         return
     
@@ -100,25 +126,6 @@ class SectionItem(BaseItem):
                 pass
         return subsecs
     
-    def handleSubsections(self, subsecs):
-        """Handles the subsections of the section that are left over after extractMetaData has done its work."""
-        for child in subsecs:
-            if child.tag == "definition": self.items.append(DefinitionItem(parent=self,tree=child)) #this is first, so that definitions are parsed a DefinitionItems rather than generic SectionItems, despite being a sectionType
-            elif child.tag in sectionTypes: self.items.append(SectionItem(parent=self,tree=child)) #other types of section, include formuladefinition
-            elif child.tag in formulaSectionTypes: self.items.append(SectionItem(parent=self,tree=child))
-            elif child.tag == "formulagroup": self.items.append(FormulaItem(parent=self,tree=child)) #top level for a formula --- handled specially so we can extract the formula itself
-            elif child.tag == "provision": self.items.append(TextItem(parent=self,tree=child,forceNewParagraph=True)) #provision tags only appear in ITA 211.1, this provides an acceptable way of displaying them
-            elif child.tag in textTypes: self.items.append(TextItem(parent=self,tree=child)) #tags that encapsulate only text
-            elif child.tag == "a":
-                txt = child.getRawText().strip().lower()
-                if txt != "previous version":
-                    showError("Unknown <a> tag: ["+txt+"]",location=self)
-                pass
-            elif isinstance(child,XMLStatParse.TextNode): #raise an exception if we are ignoring any raw text
-                if child.getRawText().strip() != "": showError("Text appearing directly in a section: ["+child.getRawText()+"]",location=self)
-            else: showError("Unknown tag: [" + repr(child) + "]", location=self)
-            pass
-        return
     
     def finalizeSectionLabel(self):
         """Method that verifies and/or sets the SectionLabel object for the section by looking at the parent section label and the labelString provided for this object.  If the underlying node did not have a code attribute, a SectionLabel is simply constructed by appending the current label to the parent's SectionLabel."""
@@ -143,7 +150,10 @@ class SectionItem(BaseItem):
         return
     def getMarginalNote(self):
         return self.marginalNote
-    def getSectionLabel(self): return self.sectionLabel #the section label object pinpointing this provision
+    def getSectionLabel(self):
+        """Returns this item's sectionLabel, or the parent's, if sectionLabel not yet assigned."""
+        if hasattr(self,"sectionLabel"): return self.sectionLabel #the section label object pinpointing this provision
+        else: return self.parent.getSectionLabel()
     def getLabelString(self): return self.labelString #the top-level string tag labeling this provision (appearing at the start of text)
     def getIndentLevel(self):
         sl = self.getSectionLabel()
@@ -195,16 +205,14 @@ class DefinitionItem(SectionItem):
     pass
 
 class FormulaItem(SectionItem):
-    """Top level item for a formula group.  Handles the initial formula. These items have "Formula" groups instead of Labels, and are at the same section label as preceding text (but force a new paragraph). The Formula sub-items are handled as ordinary sections."""
+    """Top level item for a formulagroup node.  Handles the initial formula. These items have "Formula" groups instead of Labels, and are at the same section label as preceding text (but force a new paragraph). The Formula sub-items are handled as ordinary sections."""
     def __init__(self, parent, tree):
-        self.parent = parent
-        self.tree = tree
+        BaseItem.__init__(self,parent,tree) #Hack --- not calling the right initializer for this object, we want SectionItem methods, but not all the initialization
         
         self.marginalNote = None
         self.formulaString = None
               
         subsecs = self.extractMetaData()
-        self.items = []
         self.handleSubsections(subsecs)
         return
     
@@ -236,6 +244,46 @@ class FormulaItem(SectionItem):
         followers = self.getSubParagraphs(renderContext)
         if len(followers) > 0: followers[0].forceNewParagraph = True
         return paragraphs + followers
+
+class ReadAsItem(BaseItem):
+    """Class representing a read-as text block. """
+    def __init__(self, parent, tree):
+        BaseItem.__init__(self,parent,tree)
+        sections = self.extractSectionSubtree(tree) #the subtree of the sections being read-as
+        self.handleSubsections(sections)
+        return
+    def getSectionLabel(self): return self.parent.getSectionLabel()
+    
+    def extractSectionSubtree(self,tree):
+        """Returns the subtree of a readastext tree that contains section data."""
+        sectionPieces = []
+        sections = []
+        for node in tree:
+            if isinstance(node,XMLStatParse.TextNode):
+                if node.getRawText().strip() != "": showError("Text found in a readastext: ["+node.getRawText()+"]",location=self)
+            elif node.tag == "sectionpiece": sectionPieces.append(node)
+            else:
+                if node.tag in sectionTypes or node.tag == "formulagroup": sections.append(node)
+                else: showError("Bad node found in readastext: ["+node.getTag()+"]",location=self)
+            pass
+        if len(sectionPieces) > 1: showError("Multiple sectionpieces found in readastext: ["+ str(len(sectionPieces))+"]",location=self)
+        elif len(sectionPieces) == 0:
+            if len(sections) > 0:
+                showError("No sectionpieces found in readas, but direct sections found",location=self)
+                return sections
+            else: showError("Nothing found in readastext",location=self)
+        if len(sections) > 0: showError("Both sections and sectionpieces found in readastext",location=self)
+        sectionPiece = sectionPieces[0]
+        sections = []
+        for node in sectionPiece:
+            if isinstance(node,XMLStatParse.TextNode):
+                if node.getRawText().strip() != "": showError("Text found in a sectionpiece: ["+node.getRawText()+"]",location=self)
+            elif node.tag in sectionTypes: sections.append(node)
+            elif node.tag == "formulagroup" or node.tag == "provision": sections.append(node)
+            else: showError("Bad node found in sectionpiece: ["+node.getTag()+"]",location=self)
+            pass
+        if len(sections) < 1: showError("No sections found in sectionpiece: ["+ str(len(sections))+"]",location=self)
+        return sections
 
 
 #TODO: add another phase where the Pieces are aggregated together into a single string with a separate list of (non-overlapping) decoration stored that are applied to the text when the wiki-text is generated --- this would make it much easier to analyse the text as a block an apply additional decoration!
@@ -425,7 +473,11 @@ class Piece(object):
         if not self.nextIsAlnumStart(): return False
         if self.isSpaced: return True
         return False
-    def IsAlnumStart(self): return False #does piece start with an alphanumeric character
+    @staticmethod
+    def isSpacingChar(char):
+        if char.isalnum() or char == "(": return True
+        return False
+    def isAlnumStart(self): return False #does piece start with an alphanumeric character
     def nextIsAlnumStart(self):
         """Returns True if the nextPiece exists and has an alphanumeric start (or other start that results in adding a soft space after current piece)."""
         if self.nextPiece == None: return False
@@ -442,7 +494,7 @@ class Piece(object):
 
 class TextPiece(Piece):
     def __init__(self,parent, text,previousPiece=None,nextPiece=None):
-        Piece.__init__(self,parent=parent, previousPiece=previousPiece, nextPiece=nextPiece)
+        Piece.__init__(self,parent=parent, previousPiece=previousPiece, nextPiece=nextPiece, isSpaced=False)
         if "\n" in text: showError("Newline inside text piece.", location = self)
         self.text = text
         return
@@ -451,8 +503,8 @@ class TextPiece(Piece):
     def getUnspacedText(self,renderContext): return self.text
     def isAlnumStart(self):
         if len(self.text) == 0: return self.nextIsAlnumStart() #empty text pieces should have the effect of the piece on the other side.
-        if len(self.text) == 0 or not self.text[0].isalnum(): return False
-        return True
+        if self.isSpacingChar(self.text[0]): return True
+        return False
     def eatsFollowingSpace(self):
         if len(self.text) > 0: return False
         else: return self.previousEatsSpace()
@@ -482,8 +534,9 @@ class LinkPiece(Piece):
         return u"<LinkPiece: [" + self.text + "]>"
     def getUnspacedText(self,renderContext): return self.text
     def isAlnumStart(self):
-        if len(self.text) == 0 or not self.text[0].isalnum(): return False
-        return True
+        if len(self.text) == 0: return False
+        if self.isSpacingChar(self.text[0]): return True
+        return False
     def eatsFollowingSpace(self):
         if len(self.text) > 0: return False
         else: return self.previousEatsSpace()
@@ -600,7 +653,7 @@ class Statute(object):
             self.renderPage(sec)
         return
     def renderPage(self,sec):
-        lab = sec.labelString
+        lab = sec.getSectionLabel()[0].getIDString()
         f = file("Pages/" + self.prefix + " " + lab,"w")
         f.write(sec.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()

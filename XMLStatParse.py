@@ -2,8 +2,11 @@
 
 import HTMLParser, re
 import xsutil #code to interfact with external C-code library
+from ErrorReporter import showError
 
 """The module provides code that converts an xml file representing a statute (as found in the Justice Department website) and creates an in-memory represenation of it that can be taken as input by the statute parsing code in the Statute module."""
+
+# HACK -- the HTMLParser isn't really a xml parser (most notably, not case sensitive) -- should update this to use xml.parsers.expat
 
 class XMLStatException(Exception):
     """Exception thrown by XML-statute parsing code."""
@@ -97,11 +100,11 @@ class Node(object):
         """Returns XML representation of Node.
         This consists of the Node's tag's rawText, plus the xml of children, plus (if the tag was not a startend tag) the closing tag text."""
         #TODO: check how this interacts with startend tags
-        if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
+        if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[XMLStat NOTICE Unexpected children: %s]"%self.rawText)
         return self.rawText + "".join(c.getXML() for c in self.children) + ("</" + self.rawText[1:1+len(self.tag)] + ">" if self.rawText[-2] != "/" else "")
     def getPrettyXML(self):
         """Similar to getXML, but includes newlines and indentation in xml output, to make it easier to read."""
-        if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[NOTICE Unexpected children: %s]"%self.rawText)
+        if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[XMLStat NOTICE Unexpected children: %s]"%self.rawText)
         return self.rawText + ("\n" if len(self.children)>0 else "") + "\n".join(indentString(c.getPrettyXML()) for c in self.children)+ ("\n</" + self.rawText[1:1+len(self.tag)] + ">" if self.rawText[-2] != "/" else "")
         return
     def addChild(self,node):
@@ -220,19 +223,20 @@ class XMLStatuteParser(HTMLParser.HTMLParser):
     def handle_entityref(self,name):
         #handle certain entities by converting them into plain ascii text
         if name == "amp": self.handle_data("&")
-        else: print "[NOTICE Entity Reference: %s]" %name
+        elif name =="gt": self.handle_data(">")
+        else: showError("Entity Reference: [%s]" %name, header ="XMLStat Warning")
         return
     def handle_charref(self,name):
-        print "[NOTICE Char Reference: %s]" %name
+        print showError("Char Reference: [%s]"%name, header ="XMLStat Warning")
         return
     def handle_comment(self,data):
         #ignore comments
         return
     def handle_decl(self,decl):
-        print "[NOTICE Declaration: %s]" %decl
+        print showError("Declaration: [%s]" %decl, header ="XMLStat Warning")
         return
     def handle_pi(self,data):
-        if len(self.stack) != 1: print "[NOTICE Processing Instruction: %s]" % data #ignore top-level processing instructions
+        if len(self.stack) != 1: showError("Processing Instruction: [%s]" % data, header ="XMLStat Warning") #ignore top-level processing instructions
         return
     def getTree(self):
         return self.tree
@@ -307,7 +311,7 @@ class ActPruner(HTMLParser.HTMLParser):
         if name == "amp": self.handle_data("&", original=original)
         else:
             self.handle_data(original)
-            print "[NOTICE Entity Reference: %s]" %name #report that we are seeing an entity reference that is not handled
+            print showError("Entity Reference: [%s]" %name, header="XMLStat Warning") #report that we are seeing an entity reference that is not handled
         return
     def handle_charref(self,name):
         original = "&#" + name + ";"
@@ -316,16 +320,16 @@ class ActPruner(HTMLParser.HTMLParser):
             pass
         else:
             self.handle_data(original)
-            print "[NOTICE Char Reference: %s]" %name
+            print showError("Char Reference: [%s]" %name, header="XMLStat Warning")
         return
     def handle_comment(self,data):
         #ignore comments for the moment
         return
     def handle_decl(self,decl):
-        print "[NOTICE Declaration: %s]" %decl
+        print showError("Declaration: [%s]" %decl, header="XMLStat Warning")
         return
     def handle_pi(self,data):
-        if len(self.stack) != 1: print "[NOTICE Processing Instruction: %s]" % data #ignore top-level processing instructions
+        if len(self.stack) != 1: print showError("Processing Instruction: [%s]" % data, header="XMLStat Warning") #ignore top-level processing instructions
         return
     def getTree(self):
         return self.tree
