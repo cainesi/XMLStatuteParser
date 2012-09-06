@@ -1,4 +1,4 @@
-import XMLStatParse, Statute
+import Statute
 import os, sys
 #Script to run the parser on every statute provided in the Statutes subdirectory, as a test.
 
