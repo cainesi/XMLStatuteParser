@@ -9,7 +9,10 @@ import os, sys
 #fileList = ["apca.xml","excise_act.xml","ita13.xml","ita14.xml"] #representative ita section
 #fileList = ["ita.xml"]
 #fileList = ["excise_act.xml"]
+
 fileList = os.listdir("Statutes"); fileList = [c for c in fileList if c != "ita.xml"]
+if "ita_reg.xml" in fileList: fileList.remove("ita_reg.xml")
+
 
 if len(sys.argv) > 1: fileList = [sys.argv[1]]
 

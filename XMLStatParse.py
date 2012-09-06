@@ -73,6 +73,11 @@ class Node(object):
                 pass
             raise KeyError("KeyError: " + unicode(n))
         raise XMLStatException("Node getitem only works with int, string or unicode")
+    def __contains__(self, tag):
+        for c in xrange(0,len(self.children)):
+            if isinstance(self.children[c],Node) and self.children[c].tag == tag: return True
+            pass
+        return False
     def __str__(self):
         l = []
         l.append( "<" + self.baseStr() + ">" + str(self.attrs) )

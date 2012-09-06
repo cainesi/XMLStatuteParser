@@ -7,6 +7,8 @@ import RenderContext
 from Constants import sectionTypes, formulaSectionTypes, formulaSectionMap, textTypes, knownTextTags, textTriggers
 import SectionLabelLib
 from ErrorReporter import showError
+import textutil
+from StatutePart import StatutePart
 
 #workflow for parsing statute:
 # 1) parse xml into tree structure
@@ -23,7 +25,11 @@ from ErrorReporter import showError
 
 #TODO:
 # bump indent level when one forumladefinition is nested inside another?
-# fix spacing for pieces in TextItem.  In think in general softSpacing should be required around anything that is subtagged
+# deal with headings in the statute / division identifications
+# have every item (etc) know what statute it is a part of
+# headings in the regulations take the place of some marginalnotes
+# 
+
 class StatuteException(Exception): pass
 
 #####
@@ -32,13 +38,14 @@ class StatuteException(Exception): pass
 #
 ####
 
-class BaseItem(object):
+class BaseItem(StatutePart):
     """Superclass for all items in the statute structure, with some general purpose methods of handling section labels, etc."""
-    def __init__(self, parent, tree):
-        self.parent = parent
+    def __init__(self, parent, tree, statute = None):
+        StatutePart.__init__(self,parent=parent,statute=statute)
         self.tree = tree
         self.items = []
         return
+    def getStatute(self): return self.statute #statute with which item is associated
     def getIndentLevel(self): return self.parent.getIndentLevel()
     def getSectionLabel(self): return self.parent.getSectionLabel()
     def getRenderedText(self,renderContext,skipLabel=False):
@@ -83,8 +90,8 @@ class BaseItem(object):
 
 class SectionItem(BaseItem):
     """Class for a section / subsection / etc."""
-    def __init__(self, parent, tree):
-        BaseItem.__init__(self,parent,tree)
+    def __init__(self, parent, tree, statute=None):
+        BaseItem.__init__(self,parent,tree,statute)
         #TODO : extract the section label code from the tree, if present
 
         if tree.labels == None: self.sectionLabel = None
@@ -216,7 +223,11 @@ class FormulaItem(SectionItem):
         self.handleSubsections(subsecs)
         return
     
-    def getFormulaString(self): return self.formulaString
+    def getFormulaString(self):
+        if self.formulaString == None:
+            #showError("Formula without formula string",location=self) #this is not an error -- sometimes the variables are discussed in text, or the formula is given is a seperate part of the text from the variables.
+            return ""
+        return self.formulaString
     def separateLabelLine(self): return True #the "label" of the formula should be pushed to its own line (as well as starting a new paragraph)
     
     def extractMetaData(self):
@@ -286,21 +297,20 @@ class ReadAsItem(BaseItem):
         return sections
 
 
-#TODO: add another phase where the Pieces are aggregated together into a single string with a separate list of (non-overlapping) decoration stored that are applied to the text when the wiki-text is generated --- this would make it much easier to analyse the text as a block an apply additional decoration!
 class TextItem(BaseItem):
     """Class for a blob of text, possibly with embedded links and other decorations.  Is called on nodes of the tree which just embed text, and not further subsection.
     Text inside the TextItem is stored as a linked list of Piece objects."""
     def __init__(self,parent,tree,forceNewParagraph = False):
-        self.parent = parent
-        self.tree = tree
+        BaseItem.__init__(self,parent,tree)
         self.forceNewParagraph = forceNewParagraph #force this TextItem to start a new paragraph
-        self.definedTerms = [] #list of defined terms appearing in this text block
-        self.firstPiece = Piece(self,isSpaced=False) #dummy piece to start linked list
+        self.firstPiece = textutil.Piece(self,isSpaced=False) #dummy piece to start linked list
         self.lastPiece = self.firstPiece
         self.processTree(self.tree)
-        for p in self.firstPiece:
-            if p.getDefinedTerm() != None: self.definedTerms.append(p.getDefinedTerm())
-        #TODO: add another phase where the Pieces are aggregated together into a single string with a separate list of (non-overlapping) decoration stored that are applied to the text when the wiki-text is generated --- this would make it much easier to analyse the text as a block an apply additional decoration!
+        self.text, self.decorators = self.firstPiece.assembleText()
+        
+        self.definedTerms = [] #list of defined terms appearing in this text block
+        #for p in self.firstPiece:  #TODO: instead of this, need to extract defined terms from the applicable decorators
+        #    if p.getDefinedTerm() != None: self.definedTerms.append(p.getDefinedTerm())
         
         return
     
@@ -315,20 +325,21 @@ class TextItem(BaseItem):
         self.lastPiece.setNextPiece(piece)
         self.lastPiece = piece
         return
-    
     def processTree(self,tree,stack=None):
         if stack == None: stack = [] #create stack on initial call
         if len(stack) > 100: raise StatuteException("Stackoverflow")
         stack.append(tree.tag)
         for item in tree: #iterate over the subitems
             if item.tag == "definedtermen":
-                self.addPiece(DefinedTermPiece(parent=self,text=item.getRawText().strip()))
+                self.addPiece(textutil.DefinedTermPiece(parent=self,text=item.getRawText().strip()))
             elif item.tag == "xrefexternal":
-                self.addPiece(LinkPiece(parent=self,text=item.getRawText(),target=None))
+                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),target=None))
+            elif item.tag =="xrefinternal":
+                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),target=None))
             elif isinstance(item,XMLStatParse.TextNode):  #TextNode correspond to text in the xml file.  Only include if we are inside aof <Text> tags.
                 txt = item.getRawText().strip() #to strip off leading/trailing spaces / new lines
                 if txt == "": continue
-                if self.isWrittenText(stack): self.addPiece(TextPiece(parent=self,text=txt))
+                if self.isWrittenText(stack): self.addPiece(textutil.TextPiece(parent=self,text=txt))
                 else:
                     showError("Unprocessed text: [TXT: "+ txt + "][STACK: "+str(stack)+"]",location=self) #if we are ignoring non-trivial text, raise an exception so we know there is more to handle.
                 pass
@@ -338,20 +349,23 @@ class TextItem(BaseItem):
                 self.processTree(tree=item,stack=stack) #otherwise recurse down to the contents of this item.
         stack.pop()
         return
+    def getDecoratedText(self, renderContext):
+        """Returns the items text, with the Decorator objects applied to the applicable portions."""
+        #self.decorators.sort() #todo, write code so that decorator list always sorted and never has overlaps?
+        ptr = 0
+        textList = []
+        for dec in self.decorators:
+            if dec.getStart() < ptr: raise StatuteException("Decorators out of order!")
+            textList.append(self.text[ptr:dec.getStart()])
+            textList.append(dec.getDecoratedText(renderContext=renderContext,textFull=self.text))
+            ptr = dec.getEnd()
+            pass
+        textList.append(self.text[ptr:])
+        return u"".join(textList)
     def getParagraphs(self, renderContext):
-        pieceIterator = iter(self.firstPiece)
-        indentLevel = self.getIndentLevel()
-        paragraphs = []
-        try: #get the paragraph for the initial piece to populate list
-            firstPiece = pieceIterator.next()
-        except StopIteration:
-            return [] #there were no Pieces to iterate over, so there are no paragraphs to return
-        firstParagraph = Paragraph(text=firstPiece.getText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)
-        paragraphs = [firstParagraph]
-        for piece in pieceIterator:
-            nextParagraph = Paragraph(text=piece.getText(renderContext),renderContext=renderContext,indentLevel=indentLevel)
-            if not paragraphs[-1].merge(nextParagraph): paragraphs.append(nextParagraph) #either merge or add paragraph
-        return paragraphs
+        """Return the rendered text of this item bundled into a list of Paragraph objects."""
+        indentLevel = self.getIndentLevel() 
+        return [Paragraph(text=self.getDecoratedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
     def getDefinedTerms(self):
         return self.definedTerms
     pass
@@ -395,183 +409,6 @@ class Paragraph(object):
             return self.renderContext.indentText(self.text, level = self.indentLevel)
         return self.renderContext.renderMarginalNote(self.text)
 
-#####
-#
-# Piece classes, used to represent the parts of text in a TextItem
-#
-####
-
-class Piece(object):
-    """Object representing an element in the linked-list of text stored by a TextItem, which also includes logic for linking the Pieces together into a single block of text."""
-    def __init__(self,parent,previousPiece=None,nextPiece=None,isSpaced = True):
-        self.parent = parent
-        if previousPiece == None: self.previousPiece = None
-        else: self.setPreviousPiece(previousPiece)
-        if nextPiece == None: self.nextPiece = None
-        else: self.setNextPiece(nextPiece)
-        self.isSpaced = isSpaced
-        return
-    def __iter__(self):
-        """Iterates over linked list starting from this piece."""
-        ptr = self
-        while ptr != None:
-            yield ptr
-            ptr = ptr.nextPiece
-            pass
-        return
-    def objName(self):
-        return u"<Piece>"
-    def pieceList(self):
-        """Returns a list of pieces in this linked list. (allows pieces to be modified during iteration without screwing things up)."""
-        return [c for c in self]
-    ###
-    # Linked list manipulation code
-    ###
-    def setNextPiece(self,piece):
-        """Sets the nextPiece for this piece to the specified piece, and unlinks the existing nextPiece, if any."""
-        if self.nextPiece != None: self.nextPiece.previousPiece = None #break back-link from this pieces existing target, if any
-        self.nextPiece = piece #set to new target
-        if piece.previousPiece != None: piece.previousPiece.nextPiece = None #break forward link piece targetting target, if any
-        piece.previousPiece = self  #set new backlink for target
-        return
-    def setPrevious(self,piece):
-        """Sets the previous Piece for this piece."""
-        if self.previousPiece != None: self.previousPiece.nextPiece = None
-        self.previousPiece = piece
-        if piece.nextPiece != None: piece.nextPiece.previousPiece = None
-        piece.nextPiece = self
-        return
-    def removePiece(self,piece):
-        """Remove a piece from its linked list, joining the pieces ahead and behind."""
-        if self.nextPiece != None: self.nextPiece.previousPiece = self.previousPiece
-        if self.previousPiece != None: self.previousPiece.nextPiece = self.nextPiece
-        self.nextPiece = None
-        self.previousPiece = None
-        return
-    def replace(self,newPieces):
-        """Replace this piece in linked list with the list of pieces in newPieces (which are themselves linked together by this method)."""
-        ptr = self.previousPiece
-        for p in newPieces: p.setPreviousPiece(ptr); ptr = p
-        ptr.setNextPiece(self.nextPiece)
-        return
-    ###
-    # Text combining code
-    ###
-    def getText(self, renderContext):
-        return self.softInitialSpace() + self.getUnspacedText(renderContext) + self.softTrailingSpace()
-    def getUnspacedText(self,renderContext): return u""
-    def softInitialSpace(self): return u" " if self.hasInitialSpace() else u""
-    def softTrailingSpace(self): return u" " if self.hasTrailingSpace() else u""
-    def hasInitialSpace(self):
-        if self.previousPiece == None: return False #don't add space at start of text block
-        if self.previousPiece.hasTrailingSpace(): return False #don't add spaced if trailing space already added
-        if self.previousEatsSpace(): return False
-        if self.isSpaced: return True
-        return False
-    def hasTrailingSpace(self):
-        if self.nextPiece == None: return False
-        if not self.nextIsAlnumStart(): return False
-        if self.isSpaced: return True
-        return False
-    @staticmethod
-    def isSpacingChar(char):
-        if char.isalnum() or char == "(": return True
-        return False
-    def isAlnumStart(self): return False #does piece start with an alphanumeric character
-    def nextIsAlnumStart(self):
-        """Returns True if the nextPiece exists and has an alphanumeric start (or other start that results in adding a soft space after current piece)."""
-        if self.nextPiece == None: return False
-        return self.nextPiece.isAlnumStart()
-    def previousEatsSpace(self):
-        """Returns true if prior piece in the linked list will "eat" a space that would otherwise be added to this piece. The None at the front of the list eats spaces."""
-        if self.previousPiece == None: return True
-        return self.previousPiece.eatsFollowingSpace()
-    def eatsFollowingSpace(self):
-        """Returns True if this piece will "eat" a space that would otherwise be added by the following space."""
-        return True
-    def getDefinedTerm(self): return None
-    pass
-
-class TextPiece(Piece):
-    def __init__(self,parent, text,previousPiece=None,nextPiece=None):
-        Piece.__init__(self,parent=parent, previousPiece=previousPiece, nextPiece=nextPiece, isSpaced=False)
-        if "\n" in text: showError("Newline inside text piece.", location = self)
-        self.text = text
-        return
-    def objName(self):
-        return u"<TextPiece: [" + self.text + "]>"
-    def getUnspacedText(self,renderContext): return self.text
-    def isAlnumStart(self):
-        if len(self.text) == 0: return self.nextIsAlnumStart() #empty text pieces should have the effect of the piece on the other side.
-        if self.isSpacingChar(self.text[0]): return True
-        return False
-    def eatsFollowingSpace(self):
-        if len(self.text) > 0: return False
-        else: return self.previousEatsSpace()
-    pass
-
-class DefinedTermPiece(Piece):
-    def __init__(self, parent, text, previousPiece=None,nextPiece=None):
-        Piece.__init__(self,parent=parent,previousPiece=previousPiece,nextPiece=nextPiece)
-        self.definedTerm = text
-        return
-    def objName(self):
-        return u"<DefinedTermPiece: [" + self.definedTerm + "]>"
-    def getDefinedTerm(self): return self.definedTerm
-    def getUnspacedText(self,renderContext): return renderContext.boldText("\"" + self.definedTerm + "\"")
-    def isAlnumStart(self): return True
-    def eatsFollowingSpace(self): return False
-    pass
-
-class LinkPiece(Piece):
-    """Class for a link in the text."""
-    def __init__(self, parent,text, target = None,previousPiece=None,nextPiece=None):
-        Piece.__init__(self,parent=parent,previousPiece=previousPiece,nextPiece=nextPiece)
-        self.text=text
-        self.target=target
-        return
-    def objName(self):
-        return u"<LinkPiece: [" + self.text + "]>"
-    def getUnspacedText(self,renderContext): return self.text
-    def isAlnumStart(self):
-        if len(self.text) == 0: return False
-        if self.isSpacingChar(self.text[0]): return True
-        return False
-    def eatsFollowingSpace(self):
-        if len(self.text) > 0: return False
-        else: return self.previousEatsSpace()
-    pass
-
-#####
-#
-# Various types of targets for Link Items
-#
-####
-
-class Target(object):
-    """Superclass for all types of link targets."""
-    def __init__(self, target): pass
-    pass
-
-class InternalTarget(Target):
-    """Link to another location within the current statutory instrument."""
-    def __init__(self, target): pass    
-    pass
-
-class ExternalTarget(Target):
-    """Target to another statutory instrument (another act, regulations, etc.)"""
-    def __init__(self, target): pass
-    pass
-
-class ChapterTarget(Target):
-    """Target to a chapter for the federal statutes (for historical notes.)"""
-    def __init__(self, target): pass
-    pass
-
-class BulletinTarget(Target):
-    """Target to a bulletin."""
-    def __init__(self, target): pass
-    pass
 
 #class MarginalItem(StatuteItem):
 #    """Class for a marginal note, attached to a SectionItem."""
@@ -588,9 +425,20 @@ class Statute(object):
         p = XMLStatParse.XMLStatuteParser()
         p.feed(data)
         dataTree = p.getTree()
+        self.instrumentType = None
+        self.enablingAuthority = None
+        if "statute" in dataTree:
+            self.instrumentType = "statute"
+            self.mainPart = dataTree["statute"]
+        elif "regulation" in dataTree:
+            self.instrumentType = "regulation"
+            self.mainPart = dataTree["regulation"]
+        else:
+            raise StatuteException("Cannot find any instrument in file.")
+        
         self.sectionList = None #list of the top level section items in the Statute
-        self.identTree = dataTree["statute"]["identification"]
-        self.contentTree = dataTree["statute"]["body"]
+        self.identTree = self.mainPart["identification"]
+        self.contentTree = self.mainPart["body"]
         self.processStatuteData(self.identTree)
         self.processStatuteContents(self.contentTree)
         return
@@ -599,7 +447,11 @@ class Statute(object):
         """Process the "identification" portion of the XML to gather data about the statute (title, etc)."""
         self.shortTitle = tree["shorttitle"].getRawText().strip()
         self.longTitle = tree["longtitle"].getRawText().strip()
-        self.chapter = tree["chapter"].getRawText().strip()
+        if self.instrumentType == "statute":
+            self.citationString = tree["chapter"].getRawText().strip()
+        elif self.instrumentType == "regulation":
+            self.citationString = tree["instrumentnumber"].getRawText().strip()
+            self.enablingAuthority = tree["enablingauthority"].getRawText().strip()
         #determine page name prefix for pages of this instrument
         #TODO - have a global mapping that lets us override this where desired
         self.prefix = self.shortTitle
@@ -607,7 +459,15 @@ class Statute(object):
 
     def titleString(self):
         """String giving the title of the statute."""
-        print "Title: " + self.longTitle + " (a/k/a " + self.shortTitle + ") " + self.chapter
+        print ": " + self.longTitle + " (a/k/a " + self.shortTitle + ") " + self.getCitationString()
+    
+    def getTypeString(self):
+        if self.instrumentType == "statute": return "Statute"
+        elif self.instrumentType == "regulation": return "Regulation"
+        else: raise StatuteException("No typeString because instrument has no type.")
+    
+    def getCitationString(self):
+        return self.citationString
     
     def reportString(self):
         return self.titleString() + "\n" + ", ".join(c.labelString for c in self.sectionList)
@@ -630,14 +490,13 @@ class Statute(object):
             #other cases
             else: print "Unknown tag seen at top level: [" + item.tag + "]"
             pass
-        #build dictionary pointing to the different sections by name
-        #TODO
+        #TODO structures pointing to sections by name, organizing them, etc.
         return
 
     def processSection(self,item):
         """Processes the Node for an act section (as well as subsection, etc), and add to the Statute's structure of sections."""
         #call process section on the item, with a fake parent, then extract the item and add it to the Statute's section list
-        section = SectionItem(parent=None,tree=item)
+        section = SectionItem(parent=None,tree=item, statute=self) #TODO: instead make parent=self, so statute determined automatically?
         self.sectionList.append(section)
         return
 

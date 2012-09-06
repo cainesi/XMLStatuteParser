@@ -112,11 +112,11 @@ class SectionNumbering(Numbering):
         return
     def getIDString(self): return self.labelString #no parentheses around section number
 class DefinitionNumbering(Numbering):
-    def getIDString(self): return u" \"" + self.labelString + u"\" "
+    def getIDString(self): return u"[\"" + self.labelString + u"\"]"
     def indentIncrement(self): return 0
 class FormulaNumbering(Numbering):
     def getIDString(self): return u""
-    def indentIncrement(self): return 0
+    def indentIncrement(self): return 0 #TODO: should have an increment if this is inside another formula numbering (to make nested formulas clearer)
 #
 #class SectionLabel:
 #    """class for handling sectionlabels that appear in DoJ statutes --- each section number is internally represented as a tuple of tuples of integers, together with information about how to translate back and forth to a string represenation. tuples are created in such a way that tuple comparison gives the correct ordering."""
