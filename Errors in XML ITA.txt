@@ -1,0 +1,3 @@
+34.1 - the readastext node should be a subnode of the subsection, and not of the continuedsectionsubsection
+142.7 - "readAsText" node seems to be inconsistent: does not contain any sectionpiece item (instead contains subsections directly).
+149.1(1) - definition of "public foundation" does not have a marginal note -- the relevant text is instead in a text tag
