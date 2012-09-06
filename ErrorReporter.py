@@ -2,6 +2,8 @@
 
 import sys
 
+class StrictException(Exception): pass
+
 STRICT = False
 def showError(s, header = "WARNING", location = None):
     if location != None:
@@ -15,5 +17,5 @@ def showError(s, header = "WARNING", location = None):
             location = location.parent 
             pass
         pass
-    if STRICT: raise StatuteException(s)
+    if STRICT: raise StrictException(s)
     else: sys.stderr.write(header + ": <" + s + ">\n")
