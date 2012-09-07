@@ -1,5 +1,7 @@
-import Statute
 import os, sys
+import Statute
+import Constants
+
 #Script to run the parser on every statute provided in the Statutes subdirectory, as a test.
 
 
@@ -7,10 +9,12 @@ import os, sys
 #fileList = ["apca.xml","excise_act.xml"] #test more
 #fileList = os.listdir("Statutes") #full test
 #fileList = ["apca.xml","excise_act.xml","ita13.xml","ita14.xml"] #representative ita section
-#fileList = ["ita.xml"]
+fileList = ["ita.xml"]
 #fileList = ["excise_act.xml"]
 
-fileList = os.listdir("Statutes"); fileList = [c for c in fileList if c != "ita.xml"]
+#fileList = os.listdir(Constants.STATUTEDIR); fileList = [c for c in fileList if c != "ita.xml"]
+
+
 if "ita_reg.xml" in fileList: fileList.remove("ita_reg.xml")
 
 
@@ -20,7 +24,7 @@ fileList = [c for c in fileList if c[-4:].lower() == ".xml"]
 
 for name in fileList: #parse each file in turn
     print "== " + name + " =="
-    f = file(os.path.join("Statutes", name),"r"); data = f.read(); f.close()
+    f = file(os.path.join(Constants.STATUTEDIR, name),"r"); data = f.read(); f.close()
     st = Statute.Statute(data)
     st.renderPages()
     pass

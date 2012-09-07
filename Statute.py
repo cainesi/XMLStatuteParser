@@ -1,10 +1,11 @@
 # $Id$
 # $URL$
 
-import sys
+import os
 import XMLStatParse
 import RenderContext
 from Constants import sectionTypes, formulaSectionTypes, formulaSectionMap, textTypes, knownTextTags, textTriggers
+import Constants
 import SectionLabelLib
 from ErrorReporter import showError
 import textutil
@@ -12,15 +13,15 @@ from StatutePart import StatutePart
 
 #workflow for parsing statute:
 # 1) parse xml into tree structure
-# 2) walk the tree-structure to verify consistency and specially process certain types of nodes.
+# 2) walk the tree-structure to extract section structure and extract particular types of data
 #   2a) Labels
 #   2b) Definitions
 #   2c) Marginal notes
 #   2d) Historical notes
 #   2e) Tables (?)
-# 3) Verify consistency of section labelling?
-# 4) Walk structure to detect defined terms
-# 5) Insert cross-references, etc.
+# 3) Create various meta data for Statute (e.g., section ordering information)
+# 4) Walk structure to detect defined terms / defined term applicability
+# 5) Detect cross-references and insert applicable links
 # 6) Output wikipages
 
 #TODO:
@@ -477,7 +478,6 @@ class Statute(object):
         
     def processStatuteContents(self,tree):
         self.sectionList = [] #list of top level sections contained in statute
-        
         #iterate over subitems and add all sections to self.sectionList
         for item in tree: 
             if item.tag == "": continue #top level textnodes are ignored
@@ -513,7 +513,7 @@ class Statute(object):
         return
     def renderPage(self,sec):
         lab = sec.getSectionLabel()[0].getIDString()
-        f = file("Pages/" + self.prefix + " " + lab,"w")
+        f = file(os.path.join(Constants.PAGEDIR, self.prefix) + " " + lab,"w")
         f.write(sec.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()
         pass    

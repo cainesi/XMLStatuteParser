@@ -1,7 +1,6 @@
 
-ACTFILE = "Statutes/apca.xml"
-ITAFILE = "Statutes_all/ita.xml"
-REGFILE = "Statutes_all/ita_reg.xml"
+STATUTEDIR = "/Users/caines/Program/Python/XMLStatute/Statutes"
+PAGEDIR = "/Users/caines/Program/Python/XMLStatute/Pages"
 
 #top level tags for ordinary sections handled by SectionItem (other than in formlas)
 sectionTypes = set(["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause","definition","formuladefinition" 

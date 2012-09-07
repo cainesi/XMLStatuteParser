@@ -5,7 +5,7 @@
 import ctypes
 def setupLibrary():
     global xsutil_dll
-    lib = "/Users/caines/Program/Python/XMLStatute/xsutillib.so"
+    lib = "/Users/caines/Program/Python/XMLStatute/xsutillib.so" #TODO: have this point to local directory?
     xsutil_dll = ctypes.cdll.LoadLibrary(lib)
     return
 setupLibrary()
