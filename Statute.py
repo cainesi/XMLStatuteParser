@@ -48,7 +48,13 @@ class BaseItem(StatutePart):
         return
     def getStatute(self): return self.statute #statute with which item is associated
     def getIndentLevel(self): return self.parent.getIndentLevel()
-    def getSectionLabel(self): return self.parent.getSectionLabel()
+    def getSectionLabel(self): 
+        """Returns the sectionLabel of this object, or its parent if this item is not labeled."""
+        if self.getImmediateSectionLabel() != None: return self.getImmediateSectionLabel()
+        else: return self.parent.getSectionLabel()
+    def getImmediateSectionLabel(self): 
+        """Returns the section label if this particular item, or None if self is not itself labeled."""
+        return None
     def getRenderedText(self,renderContext,skipLabel=False):
         """Get the text for this item, rendered according to the provided context."""
         paragraphs = self.getParagraphs(renderContext,skipLabel=skipLabel)
@@ -94,7 +100,7 @@ class SectionItem(BaseItem):
     def __init__(self, parent, tree, statute=None):
         BaseItem.__init__(self,parent,tree,statute)
         #TODO : extract the section label code from the tree, if present
-
+        self.finalizedLabel = False #Says whether label finalizer has run -- we should worry if it has yet there is no SectionLabel
         if tree.labels == None: self.sectionLabel = None
         else:
             self.sectionLabel = None
@@ -134,7 +140,6 @@ class SectionItem(BaseItem):
                 pass
         return subsecs
     
-    
     def finalizeSectionLabel(self):
         """Method that verifies and/or sets the SectionLabel object for the section by looking at the parent section label and the labelString provided for this object.  If the underlying node did not have a code attribute, a SectionLabel is simply constructed by appending the current label to the parent's SectionLabel."""
         #TODO: Fill this in, so all can have sectionlabels!
@@ -148,20 +153,23 @@ class SectionItem(BaseItem):
         if self.parent != None: imputedSL = self.parent.getSectionLabel().addLabel(selfType, cleanLabel)
         else: imputedSL = SectionLabelLib.SectionLabel(labelList=[(selfType,cleanLabel)])
         
-        currentSL = self.getSectionLabel()
+        currentSL = self.getImmediateSectionLabel()
         if currentSL != None: #compare with SL derived from the xml tag, if one exists, and show error on mismatch
             if not currentSL.quasiEqual(imputedSL):
                 showError("Inconsistent labelling, Current:["+currentSL.getDisplayString()+"] Imputed["+imputedSL.getDisplayString()+"]",location=self)
                 pass
         else: #otherwise use the imputed SL
             self.sectionLabel = imputedSL
+        self.finalizedLabel = True
         return
     def getMarginalNote(self):
         return self.marginalNote
-    def getSectionLabel(self):
-        """Returns this item's sectionLabel, or the parent's, if sectionLabel not yet assigned."""
-        if hasattr(self,"sectionLabel"): return self.sectionLabel #the section label object pinpointing this provision
-        else: return self.parent.getSectionLabel()
+    def getImmediateSectionLabel(self):
+        """Returns this item's sectionLabel, or None if no label.  Shows error if label has been finalized yet there is no sectionLabel."""
+        if self.sectionLabel != None: return self.sectionLabel #the section label object pinpointing this provision
+        if self.finalizedLabel: 
+            showError("SectionItem lacking immediate label ["+self.tree.tag+"]", location = self.parent) #if label finalized, no reason not to have sectionLAbel
+        return None
     def getLabelString(self): return self.labelString #the top-level string tag labeling this provision (appearing at the start of text)
     def getIndentLevel(self):
         sl = self.getSectionLabel()
@@ -249,7 +257,7 @@ class FormulaItem(SectionItem):
         return subsecs
     
     def getIndentLevel(self): return self.parent.getIndentLevel()
-    def getSectionLabel(self): return self.parent.getSectionLabel()
+    def getImmediateSectionLabel(self): return None
     def getParagraphs(self,renderContext, skipLabel = False):
         paragraphs = []
         paragraphs.append(Paragraph(text=renderContext.boldText(self.getFormulaString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel()) )
@@ -438,6 +446,9 @@ class Statute(object):
             raise StatuteException("Cannot find any instrument in file.")
         
         self.sectionList = None #list of the top level section items in the Statute
+        self.headingList = None #list of all headings in the Statute
+        self.allItemList = None #list of all headings and sections in the order they occurred (useful for making TOC for statute)
+        self.headingStack = [] #
         self.identTree = self.mainPart["identification"]
         self.contentTree = self.mainPart["body"]
         self.processStatuteData(self.identTree)
@@ -478,6 +489,8 @@ class Statute(object):
         
     def processStatuteContents(self,tree):
         self.sectionList = [] #list of top level sections contained in statute
+        self.headingList = []
+        self.allItemList = []
         #iterate over subitems and add all sections to self.sectionList
         for item in tree: 
             if item.tag == "": continue #top level textnodes are ignored
@@ -497,7 +510,7 @@ class Statute(object):
         """Processes the Node for an act section (as well as subsection, etc), and add to the Statute's structure of sections."""
         #call process section on the item, with a fake parent, then extract the item and add it to the Statute's section list
         section = SectionItem(parent=None,tree=item, statute=self) #TODO: instead make parent=self, so statute determined automatically?
-        self.sectionList.append(section)
+        self.addSection(section)
         return
 
     def processHeading(self,item):
@@ -506,7 +519,14 @@ class Statute(object):
         #create the heading object and add to list
         #TODO: Need to implement this -- requires updating the sectionlabel library first
         return
-
+    def addHeading(self,heading):
+        self.headingList.append(heading)
+        self.allItemList.append(heading)
+        return
+    def addSection(self,section):
+        self.sectionList.append(section)
+        self.allItemList.append(section)
+        return
     def renderPages(self): #TODO: clean this up
         for sec in self.sectionList:
             self.renderPage(sec)

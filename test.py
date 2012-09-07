@@ -9,7 +9,8 @@ import Constants
 #fileList = ["apca.xml","excise_act.xml"] #test more
 #fileList = os.listdir("Statutes") #full test
 #fileList = ["apca.xml","excise_act.xml","ita13.xml","ita14.xml"] #representative ita section
-fileList = ["ita.xml"]
+fileList = ["ita14.xml"]
+#fileList = ["ita.xml"]
 #fileList = ["excise_act.xml"]
 
 #fileList = os.listdir(Constants.STATUTEDIR); fileList = [c for c in fileList if c != "ita.xml"]
