@@ -6,10 +6,10 @@ class StrictException(Exception): pass
 
 STRICT = False
 def showError(s, header = "WARNING", location = None):
-    if location != None:
+    if location is not None:
         while True:
             if hasattr(location, "getSectionLabel"): #work our way up the parent chain till we find something with a getSectionLabel that returns non-None           
-                if location.getSectionLabel() != None:
+                if location.getSectionLabel() is not None:
                     s += "@<" + location.getSectionLabel().getDisplayString() + ">"
                     break
                 pass
