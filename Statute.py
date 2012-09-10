@@ -25,11 +25,11 @@ from StatutePart import StatutePart
 # 6) Output wikipages
 
 #TODO:
-# bump indent level when one forumladefinition is nested inside another?
-# deal with headings in the statute / division identifications
-# have every item (etc) know what statute it is a part of
-# headings in the regulations take the place of some marginalnotes
-# 
+# - convert to using proper xml parser - xml.parsers.expat (before the conversion gets too annoying! -- this will probably speed things up too, since expat is written in C)
+# - bump indent level when one forumladefinition is nested inside another?
+# - deal with headings in the statute / division identifications
+# - headings in the regulations take the place of some marginalnotes
+# - move items into a separate StatuteItem module
 
 class StatuteException(Exception): pass
 
@@ -40,7 +40,7 @@ class StatuteException(Exception): pass
 ####
 
 class BaseItem(StatutePart):
-    """Superclass for all items in the statute structure, with some general purpose methods of handling section labels, etc."""
+    """Superclass for all items in the statute text structure (*not* headings --- maybe I should rename it), with some general purpose methods of handling section labels, etc."""
     def __init__(self, parent, tree, statute = None):
         StatutePart.__init__(self,parent=parent,statute=statute)
         self.tree = tree
@@ -48,9 +48,12 @@ class BaseItem(StatutePart):
         return
     def getStatute(self): return self.statute #statute with which item is associated
     def getIndentLevel(self): return self.parent.getIndentLevel()
-    def getSectionLabel(self): 
+    def getLocationString(self):
+        """Location of a BaseItem is given by its sectionLabel."""
+        return self.getSectionLabel().getDisplayString()
+    def getSectionLabel(self):
         """Returns the sectionLabel of this object, or its parent if this item is not labeled."""
-        if self.getImmediateSectionLabel() != None: return self.getImmediateSectionLabel()
+        if self.getImmediateSectionLabel() is not None: return self.getImmediateSectionLabel()
         else: return self.parent.getSectionLabel()
     def getImmediateSectionLabel(self): 
         """Returns the section label if this particular item, or None if self is not itself labeled."""
@@ -123,14 +126,16 @@ class SectionItem(BaseItem):
         for child in self.tree:
             if child.tag == "marginalnote": self.marginalNote = child.getRawText().strip()
             elif child.tag == "label": #the final mark for this section (e.g., (ii.1))
-                if self.labelString != None: showError("Label encountered after another label. ["+ self.labelString +"]["+child.getRawText().strip()+"]",location=self)
+                if self.labelString is not None: showError("Label encountered after another label. ["+ self.labelString +"]["+child.getRawText().strip()+"]",location=self)
                 self.labelString = child.getRawText().strip()
                 if len(subsecs) > 0: showError("Label encountered after other text ["+ self.labelString +"]["+str(subsecs)+"]",location=self)
             elif child.tag == "formulaterm": #the letter being defined in a formula definition section
-                if self.labelString != None: showError("Formula term label encountered after another label. ["+ self.labelString +"]["+child.getRawText().strip()+"]",location=self)
+                if self.labelString is not None: showError("Formula term label encountered after another label. ["+ self.labelString +"]["+child.getRawText().strip()+"]",location=self)
                 self.labelString = child.getRawText().strip()
                 if len(subsecs) > 0: showError("Formula term label encountered after other text ["+ self.labelString +"]["+str(subsecs)+"]",location=self)
-            elif child.tag == "historicalnote": self.historicalNote = child.getRawText().strip() #TODO: improve handling of historical notes!
+            elif child.tag == "historicalnote":
+                if self.historicalNote is not None: showError("Multiple historical notes",location=self)
+                self.historicalNote = child.getRawText().strip() #TODO: improve handling of historical notes -- give them their own items that parse the contents and generate paragraphs
             elif child.tag == "repealed":
                 self.repealed = True
                 subsecs.append(child) #don't ignore 
@@ -146,15 +151,15 @@ class SectionItem(BaseItem):
         #create imputed SL from parent
         selfType = self.tree.tag  #derive the type of the new Numbering type to add to the label from the tag
         if selfType in formulaSectionMap: selfType = formulaSectionMap[selfType]
-        if self.labelString != None: cleanLabel = self.labelString.strip("().")
+        if self.labelString is not None: cleanLabel = self.labelString.strip("().")
         else: cleanLabel = u""
         if u" to " in cleanLabel or u" and " in cleanLabel: cleanLabel = cleanLabel.split(" ")[0].strip("()") #if label string contains a connector, only look at first part (this typically happen for repealed groups of sections)
         
-        if self.parent != None: imputedSL = self.parent.getSectionLabel().addLabel(selfType, cleanLabel)
+        if self.parent is not None: imputedSL = self.parent.getSectionLabel().addLabel(selfType, cleanLabel)
         else: imputedSL = SectionLabelLib.SectionLabel(labelList=[(selfType,cleanLabel)])
         
         currentSL = self.getImmediateSectionLabel()
-        if currentSL != None: #compare with SL derived from the xml tag, if one exists, and show error on mismatch
+        if currentSL is not None: #compare with SL derived from the xml tag, if one exists, and show error on mismatch
             if not currentSL.quasiEqual(imputedSL):
                 showError("Inconsistent labelling, Current:["+currentSL.getDisplayString()+"] Imputed["+imputedSL.getDisplayString()+"]",location=self)
                 pass
@@ -173,16 +178,18 @@ class SectionItem(BaseItem):
     def getLabelString(self): return self.labelString #the top-level string tag labeling this provision (appearing at the start of text)
     def getIndentLevel(self):
         sl = self.getSectionLabel()
-        if sl == None: return self.parent.getIndentLevel() #return the parent's level, if there's no section label here
+        if sl is None: return self.parent.getIndentLevel() #return the parent's level, if there's no section label here
         return sl.indentLevel()
     def getParagraphs(self,renderContext, skipLabel=False):
         #paragraphs of a section consist of the marginal note, the label and paragraphs from any subobjects.  Label is skipped if "skipLabel" is set to True
         paragraphs = []
         needForce = True #need to explicitly force a new paragraph on a subitem paragraph
-        if self.marginalNote != None: paragraphs.append(Paragraph(text=self.marginalNote, renderContext=renderContext, isMarginalNote=True)); needForce = False
+        if self.marginalNote is not None: paragraphs.append(Paragraph(text=self.marginalNote, renderContext=renderContext, isMarginalNote=True)); needForce = False
         if not skipLabel:
-            if self.getLabelString() != None: paragraphs.append(Paragraph(text=renderContext.boldText(self.getLabelString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel(), softSpace=True) ); needForce = False
+            if self.getLabelString() is not None: paragraphs.append(Paragraph(text=renderContext.boldText(self.getLabelString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel(), softSpace=True) ); needForce = False
         paragraphs += self.getSubParagraphs(renderContext)
+        if self.historicalNote is not None: paragraphs.append(Paragraph(text=self.historicalNote,renderContext=renderContext,forceNewParagraph=True,indentLevel=self.getIndentLevel()))
+
         if needForce and len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True #force a new paragraphs to start if not already accomplished by label string or marginal note
         return paragraphs
     pass
@@ -233,7 +240,7 @@ class FormulaItem(SectionItem):
         return
     
     def getFormulaString(self):
-        if self.formulaString == None:
+        if self.formulaString is None:
             #showError("Formula without formula string",location=self) #this is not an error -- sometimes the variables are discussed in text, or the formula is given is a seperate part of the text from the variables.
             return ""
         return self.formulaString
@@ -245,7 +252,7 @@ class FormulaItem(SectionItem):
         for child in self.tree:
             if child.tag == "marginalnote": self.marginalNote = child.getRawText().strip()
             elif child.tag == "formula":
-                if self.formulaString != None: showError("formulaString encountered after another. ["+ self.formulaString +"]["+child.getRawText().strip()+"]",location=self)
+                if self.formulaString is not None: showError("formulaString encountered after another. ["+ self.formulaString +"]["+child.getRawText().strip()+"]",location=self)
                 self.formulaString = child.getRawText().strip()
                 if len(subsecs) > 0: showError("formulaString encountered after other text ["+ self.formulaString +"]["+str(subsecs)+"]",location=self)
             #elif child.tag == "historicalnote": self.historicalNote = child.getRawText().strip() #TODO: improve handling of historical notes!
@@ -259,7 +266,7 @@ class FormulaItem(SectionItem):
     def getIndentLevel(self): return self.parent.getIndentLevel()
     def getImmediateSectionLabel(self): return None
     def getParagraphs(self,renderContext, skipLabel = False):
-        paragraphs = []
+        paragraphs = list()
         paragraphs.append(Paragraph(text=renderContext.boldText(self.getFormulaString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel()) )
         followers = self.getSubParagraphs(renderContext)
         if len(followers) > 0: followers[0].forceNewParagraph = True
@@ -335,7 +342,7 @@ class TextItem(BaseItem):
         self.lastPiece = piece
         return
     def processTree(self,tree,stack=None):
-        if stack == None: stack = [] #create stack on initial call
+        if stack is None: stack = [] #create stack on initial call
         if len(stack) > 100: raise StatuteException("Stackoverflow")
         stack.append(tree.tag)
         for item in tree: #iterate over the subitems
@@ -371,7 +378,7 @@ class TextItem(BaseItem):
             pass
         textList.append(self.text[ptr:])
         return u"".join(textList)
-    def getParagraphs(self, renderContext):
+    def getParagraphs(self, renderContext, skipLabel = False):
         """Return the rendered text of this item bundled into a list of Paragraph objects."""
         indentLevel = self.getIndentLevel() 
         return [Paragraph(text=self.getDecoratedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
@@ -379,11 +386,80 @@ class TextItem(BaseItem):
         return self.definedTerms
     pass
 
+
+#####
+#
+# Object of handling headings
+#
+#####
+
+class HeadingItem(StatutePart):
+    def __init__(self, parent=None, statute=None, tree=None):
+        StatutePart.__init__(self,parent=parent,statute=statute) #Heading items do not have parents, just the statute
+        if tree is None: raise StatuteException("No tree provided to HeadingItem")
+        self.tree = tree
+        self.titleString = None
+        self.labelString = None #Label assigned to this heading (part/division/etc.)
+        self.numbering = None  #SegmentNumbering for this segment (only non-None if labeled)
+        self.processHeadingData()
+        self.confirmLabel()
+        return
+    def processHeadingData(self):
+        """Extracts heading information from the tree of the heading node."""
+        subsecs = [] #TODO: factor this out into a method that can be overriden for definitions
+        for child in self.tree:
+            if child.tag == "label":
+                self.labelString = child.getRawText().strip()
+                pass
+            elif child.tag == "titletext":
+                self.titleString = child.getRawText().strip()
+                pass
+            elif isinstance(child,XMLStatParse.TextNode) and child.getRawText() == "": pass #ignore whitespace textnodes
+            else:
+                subsecs.append(child)
+                pass
+        if len(subsecs) > 0: showError("Excess nodes in headingitem: ["+str(subsecs)+"]")
+        return
+
+    def confirmLabel(self):
+        """Confirm that the label seen on the item is consistent with the information in the tree's labels value, and creates a numbering for the heading, if so.  If not, show an error."""
+        #confirm that we have a valid segmentType and create SegmentNumbering object
+        if self.labelString is None: return
+        l = self.labelString.split()
+        if len(l) != 2: showError("Incorrect number of pieces in heading label: ["+self.labelString+"]", location=self); return
+        segmentType = l[0].lower().strip()
+        segmentLabel = l[1]
+        if segmentType not in Constants.segmentTypes: showError("Unknown segment type for heading: ["+self.labelString+"]", location=self); return
+        self.numbering = SectionLabelLib.SegmentNumbering(segmentType = segmentType,labelString=segmentLabel)
+        #cross-check against the labels parameter of the tree
+        l = self.tree.labels
+        if l is None: showError("No labels parameter on heading node: ["+self.labelString+"]", location=self)
+        if (segmentType == "part" and len(l) == 2 and l[0][0] == "ga") or (segmentType == "division" and len(l) == 3 and l[0][0] == "ga" and l[1][0] == "gb") or (segmentType == "subdivision" and len(l) == 4 and l[0][0] == "ga" and l[1][0] == "gb" and l[2][0] == "gc"): pass
+        else: showError("Inconsistency with reported heading in labels parameter (not expected segments) ["+self.tree.labels+"]["+self.labelString+"]",location=self)
+        if l[-2][1].split("_")[1].lower() != segmentLabel.lower(): #check part after "_" in the second last label value
+            showError("Inconsistency with reported heading in labels parameter (segment label does not match) ["+self.tree.labels+"]["+self.labelString+"]",location=self)
+        return
+
+    def isLabeled(self):
+        """Returns True if this HeadingItem has a formal label (part, division, etc.), as opposed to simply being floating text."""
+        if self.labelString is not None: return True
+        return False
+
+    def getNumbering(self):
+        return self.numbering
+
+    def getTitleString(self):
+        return self.titleString
+
+    def getLocationString(self):
+        #TODO: Provide a string based on the heading information
+        return
+
 #####
 #
 # Paragraph class, used for formatted text output from Items
 #
-####
+#####
 
 class Paragraph(object):
     """Class for encapsulating a (part of a) paragraph of rendered text, along with logic for determining when paragraphs can be connected, and outputing final results."""
@@ -406,7 +482,6 @@ class Paragraph(object):
         if nextParagraph.forceNewParagraph: return False
         if self.isMarginalNote or nextParagraph.isMarginalNote: return False #marginal notes can't be merged
         if self.indentLevel != nextParagraph.indentLevel: return False
-        spacer = u""
         #TODO - when merging a length-0 paragraph, we should presumably maintain our softSpace rule (or do an "or"?).  There shouldn't be length-0 paragraphs though.
         if self.softSpace: spacer = (u" " if (len(nextParagraph.text) > 0 and nextParagraph.text[0].isalnum()) else u"")
         else: spacer = u""
@@ -414,26 +489,18 @@ class Paragraph(object):
         self.softSpace = nextParagraph.softSpace
         return True
     def getRenderedText(self):
-        if not self.isMarginalNote:
-            return self.renderContext.indentText(self.text, level = self.indentLevel)
-        return self.renderContext.renderMarginalNote(self.text)
+        if self.isMarginalNote: return self.renderContext.renderMarginalNote(self.text)
+        return self.renderContext.indentText(self.text, level = self.indentLevel)
 
-
-#class MarginalItem(StatuteItem):
-#    """Class for a marginal note, attached to a SectionItem."""
-#    pass
-#
-#class NoteItem(StatuteItem):
-#    """Class for an historical note attached to the end of a section."""
-#    pass
 
 class Statute(object):
     """Class that encapsulating a xml statute in a usable form.
     Based on the XMLStatuteParser, but processes the raw tree output to make it more usable."""
-    def __init__(self,data):
+    def __init__(self,data,verbose=False):
         p = XMLStatParse.XMLStatuteParser()
         p.feed(data)
         dataTree = p.getTree()
+        if verbose: print "[XML file read]"
         self.instrumentType = None
         self.enablingAuthority = None
         if "statute" in dataTree:
@@ -448,7 +515,7 @@ class Statute(object):
         self.sectionList = None #list of the top level section items in the Statute
         self.headingList = None #list of all headings in the Statute
         self.allItemList = None #list of all headings and sections in the order they occurred (useful for making TOC for statute)
-        self.headingStack = [] #
+        self.segmentData = SectionLabelLib.SegmentData(statute=self)
         self.identTree = self.mainPart["identification"]
         self.contentTree = self.mainPart["body"]
         self.processStatuteData(self.identTree)
@@ -485,6 +552,7 @@ class Statute(object):
         return self.titleString() + "\n" + ", ".join(c.labelString for c in self.sectionList)
     
     def __repr__(self):
+        """__repr__() -> unicode"""
         return "<" + self.titleString() + ">"
         
     def processStatuteContents(self,tree):
@@ -492,42 +560,46 @@ class Statute(object):
         self.headingList = []
         self.allItemList = []
         #iterate over subitems and add all sections to self.sectionList
-        for item in tree: 
-            if item.tag == "": continue #top level textnodes are ignored
+        for node in tree:
+            if node.tag == "": continue #top level textnodes are ignored
             #if item is a type of section
-            elif item.tag == "section":
-                self.processSection(item)
+            elif node.tag == "section":
+                self.processSection(node)
             #if item is a type of heading
-            elif item.tag == "heading":
-                self.processHeading(item)
+            elif node.tag == "heading":
+                self.processHeading(node)
             #other cases
-            else: print "Unknown tag seen at top level: [" + item.tag + "]"
+            else: print "Unknown tag seen at top level: [" + node.tag + "]"
             pass
         #TODO structures pointing to sections by name, organizing them, etc.
         return
 
-    def processSection(self,item):
+    def processSection(self,node):
         """Processes the Node for an act section (as well as subsection, etc), and add to the Statute's structure of sections."""
         #call process section on the item, with a fake parent, then extract the item and add it to the Statute's section list
-        section = SectionItem(parent=None,tree=item, statute=self) #TODO: instead make parent=self, so statute determined automatically?
+        section = SectionItem(parent=None,tree=node, statute=self) #TODO: instead make parent=self, so statute determined automatically?
         self.addSection(section)
         return
 
-    def processHeading(self,item):
+    def processHeading(self,node):
         """Process the Node for a heading."""
         #close off prior heading at same level or above
         #create the heading object and add to list
-        #TODO: Need to implement this -- requires updating the sectionlabel library first
+        hitem = HeadingItem(parent=None,statute=self,tree=node)
+        self.addHeading(hitem)
         return
     def addHeading(self,heading):
         self.headingList.append(heading)
         self.allItemList.append(heading)
+        if heading.isLabeled():
+            self.segmentData.addNewNumbering(heading.getNumbering(), title=heading.getTitleString())
         return
     def addSection(self,section):
         self.sectionList.append(section)
         self.allItemList.append(section)
+        self.segmentData.addSection(section.getSectionLabel())
         return
-    def renderPages(self): #TODO: clean this up
+    def renderPages(self): #TODO: this code is just a stop-gap for testing purposes
         for sec in self.sectionList:
             self.renderPage(sec)
         return

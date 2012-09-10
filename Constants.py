@@ -1,6 +1,7 @@
 
 STATUTEDIR = "/Users/caines/Program/Python/XMLStatute/Statutes"
 PAGEDIR = "/Users/caines/Program/Python/XMLStatute/Pages"
+LIBRARYDIR = "/Users/caines/Program/Python/XMLStatute"
 
 #top level tags for ordinary sections handled by SectionItem (other than in formlas)
 sectionTypes = set(["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause","definition","formuladefinition"])
@@ -34,4 +35,7 @@ knownTextTags = set(["text", #ordinary text
                      "sup", #superscript
                      "language", #foreign language (e.g., latin)
                      "label" #appeaers in the "provision" tags in 211.1
-                     ]) 
+                     ])
+
+
+segmentTypes = set(["part","division","subdivision"])

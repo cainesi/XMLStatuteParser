@@ -2,10 +2,11 @@
 
 #Module providing clean interface to external c-library of utility functions
 
-import ctypes
+import ctypes, os
+from Constants import LIBRARYDIR
 def setupLibrary():
     global xsutil_dll
-    lib = "/Users/caines/Program/Python/XMLStatute/xsutillib.so" #TODO: have this point to local directory?
+    lib = os.path.join(LIBRARYDIR,"xsutillib.so") #TODO: have this point to local directory?
     xsutil_dll = ctypes.cdll.LoadLibrary(lib)
     return
 setupLibrary()

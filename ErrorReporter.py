@@ -10,7 +10,7 @@ def showError(s, header = "WARNING", location = None):
         while True:
             if hasattr(location, "getSectionLabel"): #work our way up the parent chain till we find something with a getSectionLabel that returns non-None           
                 if location.getSectionLabel() is not None:
-                    s += "@<" + location.getSectionLabel().getDisplayString() + ">"
+                    s += "@<" + location.getLocationString() + ">"
                     break
                 pass
             if not hasattr(location, "parent"): break

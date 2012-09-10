@@ -9,8 +9,8 @@ import Constants
 #fileList = ["apca.xml","excise_act.xml"] #test more
 #fileList = os.listdir("Statutes") #full test
 #fileList = ["apca.xml","excise_act.xml","ita13.xml","ita14.xml"] #representative ita section
-fileList = ["ita14.xml"]
-#fileList = ["ita.xml"]
+#fileList = ["ita14.xml"]
+fileList = ["ita.xml"]
 #fileList = ["excise_act.xml"]
 
 #fileList = os.listdir(Constants.STATUTEDIR); fileList = [c for c in fileList if c != "ita.xml"]
@@ -26,7 +26,7 @@ fileList = [c for c in fileList if c[-4:].lower() == ".xml"]
 for name in fileList: #parse each file in turn
     print "== " + name + " =="
     f = file(os.path.join(Constants.STATUTEDIR, name),"r"); data = f.read(); f.close()
-    st = Statute.Statute(data)
+    st = Statute.Statute(data, verbose=True)
     st.renderPages()
     pass
 

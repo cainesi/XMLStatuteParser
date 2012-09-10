@@ -3,16 +3,13 @@
 #$Date$
 #$URL$
 
-import re
-import sys
-from Constants import sectionTypes, formulaSectionTypes, formulaSectionMap, textTypes, tagSection
-
+from ErrorReporter import showError
+from Constants import tagSection, sectionTypes
 
 class SectionLabelException(Exception): pass
 
 TEST = True
 DEBUG = False
-
 
 class SectionLabel:
     """Class encapsulating the label for a specific section of an Act."""
@@ -67,8 +64,7 @@ class SectionLabel:
             pass
         return True
     def __hash__(self):
-        hash( tuple(n.getTuple() for n in self.numberings) )
-        return
+        return hash( tuple(n.getTuple() for n in self.numberings) ) #TODO: have this calculated only once, and then stored for future use?
     def addLabel(self,labelType,labelString):
         """Creates a new sectionLabel by appending the specified labelString."""
         newSL = SectionLabel(labelList = [(labelType,labelString)])
@@ -124,141 +120,166 @@ class FormulaNumbering(Numbering):
 #
 #####
 
+validSegmentTypes = ["part","division","subdivision"]
+segmentTitleString = {"part":"PART","division":"Division","subdivision":"subdivision"}
 
-class Division:
-    """class for the recording information about part/division/subdivision in the Act/regulations."""
-    def __init__(self,part=None,division=None,subDivision=None):
-        self.part = part
-        self.division = division
-        self.subDivision = subDivision
-        if self.part is None:
-            self.tuple = ()
-            pass
-        elif self.division is None:
-            self.tuple = (self.part,)
-            pass
-        elif self.subDivision is None:
-            self.tuple = (self.part,self.division)
-            pass
-        else:
-            self.tuple = (self.part, self.division, self.subDivision)
-            pass
-        pass
-    
-    def getTuple(self):
-        return self.tuple
-    
-    def __len__(self):
-        return len(self.tuple)
-    
-    def __str__(self):
-        titles = ("Part", "Division", "Subdivision")
-        return " ".join(["%s %s" % c for c in zip(titles,self.tuple)])
+class SegmentNumbering:
+    """Class for a single segment level."""
+    def __init__(self,segmentType,labelString):
+        self.segmentType = segmentType
+        if self.segmentType not in validSegmentTypes: raise SectionLabelException("Unknown segment numbering type: ["+segmentType+"]")
+        self.labelString = labelString
+        return
+    def getSegmentType(self): return self.segmentType
+    def getLabelString(self): return self.labelString
+    def getString(self): return segmentTitleString[self.segmentType] + u" " + self.labelString
+    def __hash__(self): return hash((self.segmentType,self.labelString))
+    def __eq__(self,dn):
+        if dn is None: return False
+        if dn.segmentType != self.segmentType: return False
+        if dn.labelString != self.labelString: return False
+        return True
+    def __ne__(self,dn): return not self == dn
+    def __repr__(self): return "<SegmentNumbering:" + self.segmentType + ":" + self.labelString + ">"
+    def __str__(self): return self.getString()
+    pass
 
-    def labelString(self):
-        """Return the string for the final part of the division (eg, for a sub-division, would be just "subdivision xxx")."""
-        titles = ("PART", "Division", "Subdivision")
-        parts = ["%s %s" % c for c in zip(titles,self.tuple)]
-        if len(parts) == 0:
-            return None
-        return parts[-1]
-        
+class Segment:
+    """class for the recording the full segment data for a portion of the act, composed of a list of SegmentNumberings."""
+    def __init__(self,segmentNumberingList):
+        self.numberings = segmentNumberingList
+        self.confirmNumberings()
+        return
 
-    def __repr__(self):
-        return "<Division:"+str(self)+">"
-
-    def __eq__(self,d2):
-        if not isinstance(d2,Division):
-            raise Exception("Can only compare to Division object")
-        if len(self) != len(d2):
-            return False
-        for x,y in zip(self.getTuple(),d2.getTuple()):
-            if x != y:
-                return False
-            pass
+    def confirmNumberings(self):
+        """Confirm that the numberings for this Segment conform to our expectations (part, division, subdivision) or throw an exception."""
+        if len(self.numberings) > 0:
+            if self.numberings[0].getSegmentType() != "part": raise SectionLabelException("First element of Segment not part: ["+str(self.numberings)+"]")
+        else: return True
+        if len(self.numberings) > 1:
+            if self.numberings[1].getSegmentType() != "division": raise SectionLabelException("Second element of Segment not division: ["+str(self.numberings)+"]")
+        else: return True
+        if len(self.numberings) > 2:
+            if self.numberings[2].getSegmentType() != "subdivision": raise SectionLabelException("Third element of Segment not subdivision: ["+str(self.numberings)+"]")
+        else: return True
+        if len(self.numberings) > 3:
+            raise SectionLabelException("Excessively long numbering list for Segment object: ["+str(self.numberings)+"]")
         return True
 
-    def __ne__(self,d2):
-        return not self == d2
+    def __len__(self):
+        return len(self.numberings)
+
+    def __iter__(self):
+        for n in self.numberings: yield n
+
+    def __eq__(self,s2):
+        if s2 is None: return False
+        if len(self) != len(s2): return False
+        for c in xrange(0,len(self)):
+            if self.numberings[c] != s2.numberings[c]: return False
+        return True
+
+    def __ne__(self,s2):
+        return not self == s2
 
     def __hash__(self):
-        return hash(self.tuple)
+        return hash(tuple(hash(c) for c in self))
 
-    def isSubDivisionOf(self,d2):
-        """returns True if this Division is equal to or contained in the second Division object"""
-        if not isinstance(d2,Division):
-            raise Exception("Can only compare to Division object")
-        
-        if len(d2) > len(self):
+    def __str__(self): return "(" + " ".join(str(c) for c in self.numberings) + ")"
+
+    def __repr__(self): return "<Segment:"+self.numberings+">"
+
+    def advanceSegment(self,newNumbering):
+        """Returns the next Segment following this Segment, that involves the given newNumbering."""
+        if newNumbering.getSegmentType() == "part":
+            return Segment([newNumbering])
+        elif newNumbering.getSegmentType() == "division":
+            if len(self) < 1: raise SectionLabelException("Adding division to a length 0 Segment.")
+            return Segment([self.numberings[0], newNumbering])
+        elif newNumbering.getSegmentType() == "subdivision":
+            if len(self) < 2: raise SectionLabelException("Adding subdivision to a Segment of length < 2.")
+            return Segment(self.numberings[0:2] + [newNumbering])
+        raise SectionLabelException("Cannot add specified numbering to Segment object: ["+str(newNumbering)+"]")
+
+    def isSubSegmentOf(self,s2):
+        """returns True if this Segment is equal to or contained in (i.e., is a subset of) the second Segment object"""
+        if not isinstance(s2,Segment): raise SectionLabelException("Can only do containment comparison with Segment object")
+        if len(s2) > len(self):
             return False
-        
-        for c in [x==y for x,y in zip(self.tuple,d2.getTuple())]:
-            if c == False:
-                return False
-            pass
+        for c in xrange(0,len(s2)):
+            if s2.numberings[c] != self.numberings[c]: return False
         return True
-    
+
+    def isSuperSegmentOf(self,s2):
+        """converse of isSubSegmentOf"""
+        if not isinstance(s2,Segment): raise SectionLabelException("Can only do containment comparison with Segment object")
+        return s2.isSubSegmentOf(self)
+
     def getPart(self):
         if len(self) >= 1:
-            return Division(part=self.part)
+            return Segment(self.numberings[:1])
         return None
     def getDivision(self):
         if len(self) >= 2:
-            return Division(part=self.part,division=self.division)
+            return Segment(self.numberings[:2])
         return None
-    def getSubDivision(self):
+    def getSubdivision(self):
         if len(self) >= 3:
-            return Division(part=self.part,division=self.division,subDivision=self.subDivision)
-        return None 
-    def getChangedDivisions(self,d2):
+            return Segment(self.numberings[:3])
+        return None
+    def getChangedNumberings(self,d2):
         """Get a list of slices of d2 that differ from self. E.g., if d2 has a part, division and subdivision, and self and d2 have the save part but different divisions, this would be a 2-element list of d2's division and subdivision."""
-        changedDivisions = []
-        stup = self.getTuple()
-        dtup = d2.getTuple()
-        if len(dtup)>=1 and (len(stup) < 1 or dtup[0] != stup[0]):
-            changedDivisions.append(d2.getPart())
-            changedDivisions.append(d2.getDivision())
-            changedDivisions.append(d2.getSubDivision())            
+        for c in xrange(0,len(self)):
+            if c >= len(d2): return list()
+            if self.numberings[c] != d2.numberings[c]: return d2.numberings[c:]
             pass
-        elif len(dtup)>=2 and (len(stup)<2 or dtup[1] != stup[1]):
-            changedDivisions.append(d2.getDivision())
-            changedDivisions.append(d2.getSubDivision())
-            pass
-        elif len(dtup)>=3 and (len(stup)<3 or dtup[2] != stup[2]):
-            changedDivisions.append(d2.getSubDivision())
-            pass
-        changedDivisions = [c for c in changedDivisions if c is not None]
-        return changedDivisions
+        return d2.numberings[len(self):]
         
     pass
 
-class DivisionData:
-    """class for storing data regarding divisions, including a dictionary linking sectionlabels to divisions, and a dictionary of division titles."""
-    def __init__(self):
-        self.divisionTitle = {} #dictionary indexed by division label, giving division title
-        self.divisionDict = {} #dictionary indexed by sectional label, giving the division the section is in
+class SegmentData:
+    """Class for storing data regarding divisions, including a dictionary linking sectionlabels to divisions, and a dictionary of division titles.  Allows sections and segment headings to be recorded as they are encountered moving through the Act, and records how the sections are grouped together into Segments (parts, divisions, etc)."""
+    def __init__(self, statute):
+        self.statute = statute
+        self.currentSegment = Segment([]) #the division sections are currently being added to
+        self.currentPart = None
+        self.currentDivision = None
+        self.currentSubdivision = None
+        self.segmentList = []
+        self.segmentTitle = {} #dictionary indexed by Segment, giving segment's title
+        self.containingSegment = {} #dictionary indexed by sectional label, giving the most narrowest Segment the section is in
+        self.segmentContents = {} #dictionary providing a set of sections in each segment of the statute
+        self.segmentContents[Segment([])] = set([]) #these two entries are dumping grounds for sections that are not in a Segment at all, or do not have a division / subdivision / etc
+        self.segmentContents[None] = set([])
         return
-    def setDivisionTitle(self,division,title):
-        self.divisionTitle[division] = title
-    def getDivisionTitle(self,division):
-        return self.divisionTitle[division]
-    def clearDivisionDict(self):
-        #discard the information regarding sl assignments
-        self.divisionDict = {}
+    def addNewNumbering(self,newNumbering, title=None):
+        self.currentSegment = self.currentSegment.advanceSegment(newNumbering)
+        print self.currentSegment
+        if self.currentSegment in self.segmentList: showError("Repeated Segment seen: ["+str(self.currentSegment)+"]")
+        self.segmentList.append(self.currentSegment)
+        self.currentPart = self.currentSegment.getPart()
+        self.currentDivision = self.currentSegment.getDivision()
+        self.currentSubdivision = self.currentSegment.getSubdivision()
+        if self.currentSegment not in self.segmentContents: self.segmentContents[self.currentSegment] = set([])
+        if self.currentPart not in self.segmentContents: self.segmentContents[self.currentPart] = set([])
+        if self.currentDivision not in self.segmentContents: self.segmentContents[self.currentDivision] = set([])
+        if self.currentSubdivision not in self.segmentContents: self.segmentContents[self.currentSubdivision] = set([])
+        if title is not None:
+            self.segmentTitle[self.currentSegment] = title
         return
-    def assignSL(self,sL, division):
-        self.divisionDict[sL] = division
-    def getSLAssignment(self,sL):
-        if sL not in self.divisionDict:
-            return None
-        return self.divisionDict[sL]
-    def getSLsInDivision(self,division):
-        """return an ordered list of sL's in a specified division"""
-        #TODO
+    def addSection(self,sectionLabel):
+        """Record that the specified sectionLabel exists within the current Segment of the statute (and all enclosing super-Segments)."""
+        self.containingSegment[sectionLabel] = self.currentSegment
+        self.segmentContents[self.currentPart].add(sectionLabel)
+        self.segmentContents[self.currentDivision].add(sectionLabel)
+        self.segmentContents[self.currentSubdivision].add(sectionLabel)
+        self.segmentContents[self.currentSegment].add(sectionLabel)
         return
+    def setSegmentTitle(self,segment,title):
+        self.segmentTitle[segment] = title
+    def getSegmentTitle(self,segment):
+        return self.segmentTitle[segment]
     pass
-    
-    
 
 class SectionLabelRange:
     def __init__(self,start,end=None,universal = False):
