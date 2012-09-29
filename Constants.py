@@ -1,7 +1,7 @@
 
-STATUTEDIR = "/Users/caines/Program/Python/XMLStatute/Statutes"
-PAGEDIR = "/Users/caines/Program/Python/XMLStatute/Pages"
-LIBRARYDIR = "/Users/caines/Program/Python/XMLStatute"
+STATUTEDIR = "/Users/caines/Program/Python/XMLStatute/Statutes"  #where statute xml files are found
+PAGEDIR = "/Users/caines/Program/Python/XMLStatute/Pages"  #where the output wikipage should be stored
+LIBRARYDIR = "/Users/caines/Program/Python/XMLStatute" #where compile c modules will be located
 
 #top level tags for ordinary sections handled by SectionItem (other than in formlas)
 sectionTypes = set(["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause","definition","formuladefinition"])

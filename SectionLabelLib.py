@@ -253,8 +253,8 @@ class SegmentData:
         self.segmentContents[None] = set([])
         return
     def addNewNumbering(self,newNumbering, title=None):
+        """Called when a new heading numbering seen in the court of the statute.  This method computes what new segment must be (based on the latest numbering and the numberings of the preceding segment) and updates the segment information accordingly."""
         self.currentSegment = self.currentSegment.advanceSegment(newNumbering)
-        print self.currentSegment
         if self.currentSegment in self.segmentList: showError("Repeated Segment seen: ["+str(self.currentSegment)+"]")
         self.segmentList.append(self.currentSegment)
         self.currentPart = self.currentSegment.getPart()
@@ -264,8 +264,7 @@ class SegmentData:
         if self.currentPart not in self.segmentContents: self.segmentContents[self.currentPart] = set([])
         if self.currentDivision not in self.segmentContents: self.segmentContents[self.currentDivision] = set([])
         if self.currentSubdivision not in self.segmentContents: self.segmentContents[self.currentSubdivision] = set([])
-        if title is not None:
-            self.segmentTitle[self.currentSegment] = title
+        if title is not None: self.segmentTitle[self.currentSegment] = title
         return
     def addSection(self,sectionLabel):
         """Record that the specified sectionLabel exists within the current Segment of the statute (and all enclosing super-Segments)."""
