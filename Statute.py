@@ -26,7 +26,7 @@ import SectionLabelLib
 # - bump indent level when one forumladefinition is nested inside another?
 # - deal with headings in the statute / division identifications
 # - headings in the regulations take the place of some marginalnotes
-# - move items into a separate StatuteItem module
+# - Move marginal notes that are attached to top level sections, when there are subsections in the section, and first subsection is un-noted.
 
 class StatuteException(Exception): pass
 
@@ -35,6 +35,14 @@ class Statute(object):
     """Class that encapsulating a xml statute in a usable form.
     Based on the XMLStatuteParser, but processes the raw tree output to make it more usable."""
     def __init__(self,data,verbose=False):
+        """
+        Initialize Statute object based on it's raw XML representation.
+        Metadata about the Statute is stored in following members:
+        sectionList/headingList/allItemList - lists of the corresponding top-level items in the Statute.
+        segmentData - contain information about the segments (parts / divisions / subdivisions) in the statute and which sections correspond to which segments.
+        sectionData - contains information about the sections in the Statute, their text-searchable representations and their orderings.
+        instrumentType - gives the type of instrument represented by the object -- currently just "statute" and "regulation"
+        """
         p = XMLStatParse.XMLStatuteParser()
         p.feed(data)
         dataTree = p.getTree()
@@ -56,10 +64,71 @@ class Statute(object):
         self.segmentData = SectionLabelLib.SegmentData(statute=self)
         self.identTree = self.mainPart["identification"]
         self.contentTree = self.mainPart["body"]
-        self.processStatuteData(self.identTree)
-        self.processStatuteContents(self.contentTree)
+        self.processStatuteData(self.identTree) #extract meta-data about the statute from the xml
+        self.processStatuteContents(self.contentTree) #extract the contents of the statute
+        self.sectionData = SectionLabelLib.SectionData(statute=self)
         return
+
+    ###
+    #
+    # General utility methods
+    #
+    ###
+
+
+    def titleString(self):
+        """String giving the title of the statute (mainly for debugging)."""
+        return ": " + self.longTitle + " (a/k/a " + self.shortTitle + ") " + self.getCitationString()
+
+    def isRegulation(self):
+        """True if this object represents a regulation."""
+        if self.instrumentType == "regulation": return True
+        return False
+
+    def isStatute(self):
+        """True if this object represents a statute."""
+        if self.instrumentType == "statute": return True
+        return False
+
+    def getTypeString(self):
+        if self.instrumentType == "statute" or self.instrumentType == "regulation": return self.instrumentType
+        else: raise StatuteException("No typeString because instrument has no type.")
     
+    def getCitationString(self):
+        """Returns the citation for the instrument (e.g., the chapter # for a consolidated act)"""
+        return self.citationString
+    
+    def reportString(self):
+        """Outputs the name of the statute and a list of its sections."""
+        return self.titleString() + "\n" + ", ".join(c.labelString for c in self.sectionList)
+    
+    def __repr__(self):
+        """@rtype: unicode"""
+        return "<" + self.titleString() + ">"
+
+    def itemIterator(self):
+        """Returns an iterator over all the Items in the structure.
+        @rtype: StatuteItem.BaseItem
+        """
+        for sec in self.sectionList:
+            for item in sec.itemIterator(): yield item
+        return
+
+    def sectionIterator(self):
+        """
+        Returns an iterator over the SectionItems in the structure.
+        @rtype: StatuteItem.SectionItem
+        """
+        for item in self.itemIterator():
+            if isinstance(item,StatuteItem.SectionItem): yield item
+        return
+
+    ###
+    #
+    # Content processing methods.
+    #
+    ###
+
     def processStatuteData(self,tree):
         """Process the "identification" portion of the XML to gather data about the statute (title, etc)."""
         self.shortTitle = tree["shorttitle"].getRawText().strip()
@@ -69,30 +138,12 @@ class Statute(object):
         elif self.instrumentType == "regulation":
             self.citationString = tree["instrumentnumber"].getRawText().strip()
             self.enablingAuthority = tree["enablingauthority"].getRawText().strip()
-        #determine page name prefix for pages of this instrument
+            #determine page name prefix for pages of this instrument
         #TODO - have a global mapping that lets us override this where desired
         self.pagePrefix = self.shortTitle
         return
 
-    def titleString(self):
-        """String giving the title of the statute."""
-        print ": " + self.longTitle + " (a/k/a " + self.shortTitle + ") " + self.getCitationString()
-    
-    def getTypeString(self):
-        if self.instrumentType == "statute": return "Statute"
-        elif self.instrumentType == "regulation": return "Regulation"
-        else: raise StatuteException("No typeString because instrument has no type.")
-    
-    def getCitationString(self):
-        return self.citationString
-    
-    def reportString(self):
-        return self.titleString() + "\n" + ", ".join(c.labelString for c in self.sectionList)
-    
-    def __repr__(self):
-        """__repr__() -> unicode"""
-        return "<" + self.titleString() + ">"
-        
+
     def processStatuteContents(self,tree):
         self.sectionList = [] #list of top level sections contained in statute
         self.headingList = []
@@ -137,6 +188,14 @@ class Statute(object):
         self.allItemList.append(section)
         self.segmentData.addSection(section.getSectionLabel())
         return
+
+
+    ###
+    #
+    # File output methods.
+    #
+    ###
+
     def renderPages(self): #TODO: this code is just a stop-gap for testing purposes
         for sec in self.sectionList:
             self.renderPage(sec)

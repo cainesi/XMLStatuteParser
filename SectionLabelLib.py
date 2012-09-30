@@ -18,7 +18,7 @@ class SectionLabel:
         self.numberings = []
         if labelList != None:
             for tag, labelString in labelList:
-                if tag in tagSection: sectionType = tagSection[tag]
+                if tag in tagSection: sectionType = tagSection[tag] #decode the short version of the section name.
                 else: sectionType = tag
                 if sectionType == "section":self.numberings.append(SectionNumbering(sectionType=sectionType,labelString=labelString))
                 elif sectionType == "definition": self.numberings.append(DefinitionNumbering(sectionType=sectionType,labelString=labelString))
@@ -28,13 +28,11 @@ class SectionLabel:
             pass
         elif numberings != None: self.numberings = [c for c in numberings]
         return
-    def setNumberings(self,numberings): self.numberings = numberings
+    #def setNumberings(self,numberings): self.numberings = numberings #these object should be immutable after creation!
     def getNumberings(self): return self.numberings
     def __add__(self,sl):
         """Creates a new sectionLabel by adding on the specified sectionLabel."""
-        newSL = SectionLabel()
-        newSL.setNumberings(self.getNumberings() + sl.getNumberings())
-        return newSL
+        return SectionLabel(numberings=self.getNumberings() + sl.getNumberings())
     def __getitem__(self,n):
         """Create a SectionLabel which is a slice of the current label."""
         if type(n) == slice: return SectionLabel(numberings=self.numberings[n])
@@ -49,6 +47,9 @@ class SectionLabel:
             pass
         return True
     def __ne__(self,sl): return not self.__eq__(sl)
+    def getSubLabels(self):
+        """Returns the list of non-empty initial-sublabels of this label (including the label itself)."""
+        return [self[:n] for n in xrange(len(self),0,-1)]
     def quasiEqual(self,sl):
         """Returns True if the last numberings are quasiEqual and the remaining numberings are actually equal.  Used for testing whether imputed section labels are being computed accurately (since impused section labels will not know what term is being defined in a definition section)"""
         if sl == None: return False
@@ -70,6 +71,8 @@ class SectionLabel:
         newSL = SectionLabel(labelList = [(labelType,labelString)])
         return self + newSL
     def __str__(self): return self.getIDString()
+    def __repr__(self):
+        return self.getDisplayString()
     def getIDString(self):
         """Returns a string that can be used match against reference to sections in the text of the instrument."""
         return u"".join(n.getIDString() for n in self.numberings)
@@ -77,6 +80,11 @@ class SectionLabel:
         """Returns a string representation for the section label for debugging purposes."""
         return u"".join(n.getDisplayString() for n in self.numberings)
     def indentLevel(self): return sum(n.indentIncrement() for n in self.numberings)
+    def hasLastEmptyDefinition(self):
+        """Returns True if one of the SectionLabel's numberings is an empty definition."""
+        if len(self.numberings) == 0: return False
+        if isinstance(self.numberings[-1],DefinitionNumbering) and self.numberings[-1].labelString == "": return True
+        return False
     pass
 
 class Numbering(object):
@@ -111,7 +119,7 @@ class DefinitionNumbering(Numbering):
     def getIDString(self): return u"[\"" + self.labelString + u"\"]"
     def indentIncrement(self): return 0
 class FormulaNumbering(Numbering):
-    def getIDString(self): return u""
+    def getIDString(self): return u"<" + self.labelString + u">" #return u""
     def indentIncrement(self): return 0 #TODO: should have an increment if this is inside another formula numbering (to make nested formulas clearer)
 
 #####
@@ -280,127 +288,136 @@ class SegmentData:
         return self.segmentTitle[segment]
     pass
 
-class SectionLabelRange:
-    def __init__(self,start,end=None,universal = False):
-        """initializes range with start and end points (for comparisons, test labels are truncated to the length of start or end, respective). If end is None, range will match against anything with start as a stem. If universal is True, the range will match all sectionLabels"""
-        self.start = start
-        self.universal = universal
-        if self.universal:
-            self.singleton = False
-            return
-        if end is None or start == end:
-            self.singleton = True
-            self.end = None
+class SectionData(object):
+    def __init__(self,statute):
+        """
+        Object that encapsulates information about the ordering of sections in the Statute, and various look-up tables so that SectionItems can be located based on the full or partial text representation of the label.
+        self.sectionStart - for each sL gives the number of appearance for the label
+        self.sectionEnd - for each sL gives the appearance of the last section for which this section is a super-label
+        self.stringToSection - for each string representation of a sL gives the corresponding sectionItem
+        @type statute: Statute.Statute
+        """
+        self.statute = statute
+        self.sectionList = [si for si in self.statute.sectionIterator()] #this will get us a list of all sections, in order
+        self.sectionStart = {}
+        self.sectionEnd = {} #the number of the last label under the given label
+        self.numberToSL = {}
+        self.stringToSectionItem = {}
+        n = 0
+        for section in self.sectionList: #asign a number to each section labeling
+            sL = section.getSectionLabel()
+            if sL in self.sectionStart:  #if we've already seen the sectionLabel
+                if sL.hasLastEmptyDefinition(): pass #if there are duplicates because we have multiple empty defs, just ignore (there will be other errors generated, if these are not repealed)
+                else: showError("Duplicated sectionLabel ["+str(sL)+"]["+section.getRawText()+"]", location=section)
+            else:
+                self.sectionStart[sL] = n
+                self.sectionEnd[sL] = n+1 #plus one, so we follow the usual python interval-convention
+                for superSL in sL.getSubLabels(): self.sectionEnd[superSL] = n+1
+                self.numberToSL[n] = sL
+                sLString = sL.getIDString()
+                if sLString in self.stringToSectionItem: showError("Repeated sectionlabel string representation ["+sLString+"]["+section.getRawText()+"]",location=section)
+                else: self.stringToSectionItem[sLString] = section
+            n += 1
             pass
-        else:
-            self.singleton = False
-            self.end = end
-        pass
-    
-    def __str__(self):
-        if self.universal:
-            return "[universal]"
-        if self.singleton:
-            return "[%s]"%self.start
-        return "[%s to %s]"%(str(self.start),str(self.end))
+        return
 
-    def __repr__(self):
-        return "<SectionLabelRange:%s>"%str(self)
-    
-    def containsSectionLabel(self,sectionLabel):
-        if self.universal:
-            return True
-        sl = sectionLabel
-        if self.singleton:
-            return sl[:len(self.start)] == self.start
-            pass
-        if not sl[:len(self.start)] >= self.start:
-            return False
-        if not sl[:len(self.end)] <= self.end:
-            return False
-        return True
-    
-    def possiblyContainsSectionLabel(self,sectionLabel):
-        """returns true if it is possible for an extention of this sectionLabel to be in the range"""
-        
-        if self.universal:
-            return True
-        if self.isSingleton(): #if a singleton, 
-            x = min(len(self.start), len(sectionLabel))
-            return sectionLabel[:x] == self.start[:x]
-            pass
-        xs = min(len(self.start),len(sectionLabel))
-        xe = min(len(self.end),len(sectionLabel))
-        
-        return (sectionLabel[:xs]>=self.start[:xs] and sectionLabel[:xe]<=self.end[:xe])
-        
-    def isSingleton(self):
-        return self.singleton
-    
-    def addSectionLabel(self,newLabel):
-        if not self.singleton:
-            raise Exception("attempting to add label to non-singleton range")
-        self.singleton = False
-        if newLabel< self.start:
-            print("problem: adding to a SectionLabelRange below start point")
-            self.end = self.start
-            self.start = newLabel
-            pass
-        else:
-            self.end = newLabel
-            pass
-        pass
+    def ltSL(self, sL1, sL2):
+        """
+        Compare two section labels, returns True if sL1 is earlier than sL2.
+        @type sL1: SectionLabel
+        @type sL2: SectionLabel
+        """
+        return self.sectionStart[sL1] < self.sectionStart[sL2]
+    def leSL(self,sL1,sL2):
+        """
+        Compare two section labels, returns True if sL1 is earlier than sL2.
+        @type sL1: SectionLabel
+        @type sL2: SectionLabel
+        """
+        return self.sectionStart[sL1] <= self.sectionStart[sL2]
     pass
 
-    def isUniversal(self):
-        return self.universal
+    def getSectionItemFromString(self,sLString,locationItem=None,locationSL=None):
+        """Returns the sectionItem references by the given string.  If location is provided, it will also try to match sectionLabel strings by combining stems from the location label's string with the specified string.  Returns None (and shows an error) if no matches can be found.
+        @type sLString: unicode
+        @type locationSL: SectionLabel
+        @type locationItem: StatuteItem.SectionItem
+        @rtype: StatuteItem.SectionItem
+        """
+        if sLString in self.stringToSectionItem: return self.stringToSectionItem[sLString]
+        if locationSL is None:
+            if locationItem is None: showError("Could not locate sectionlabel string ["+sLString+"]"); return None
+            locationSL = locationItem.getSectionLabel()
+            pass
+        for subLabel in locationSL.getSubLabels():
+            #print(">>" + subLabel.getIDString() + sLString)
+            if (subLabel.getIDString() + sLString) in self.stringToSectionItem: return self.stringToSectionItem[subLabel.getIDString() + sLString]
+            pass
+        showError("Could not find item for ["+sLString+"][hint:"+locationSL.getIDString()+"]")
+        return None
 
-class SectionLabelSet:
-    def __init__(self,sectionLabelRangeList):
-        self.sectionLabelRangeList = sectionLabelRangeList
-        pass
+    def getSectionInterval(self,sLList):
+        return SectionLabelInterval(self,sLList)
+
+    def getSectionCollection(self,sLListList):
+        intervals = [self.getSectionInterval(l) for l in sLListList]
+        return SectionLabelCollection(self,intervals)
+
+    def getUniversalCollection(self):
+        return UniversalSectionLabelCollection(self)
+
+class SectionLabelInterval(object):
+    """Class representing a contiguous interval of sections."""
+    def __init__(self, sectionData, sLList):
+        self.sectionData = sectionData
+        self.start = -1
+        self.end = -1
+        if len(sLList) > 0:
+            self.start = self.sectionData.sectionStart[sLList[0]]
+            self.end = self.sectionData.sectionEnd[sLList[0]]
+            for sL in sLList[1:]:
+                if self.sectionData.sectionStart[sL] < self.start: self.start = self.sectionData.sectionStart[sL]
+                if self.sectionData.sectionEnd[sL] > self.end: self.end = self.sectionData.sectionEnd[sL]
+                pass
+            pass
+        return
+
+    def containsSL(self,sL):
+        """Returns True if the given section label is contained in the interval, otherwise False.
+        @type sL: SectionLabel
+        """
+        n = self.sectionData[sL]
+        if n >= self.start and n < self.end: return True
+        return False
+
     def __len__(self):
-        return len(self.sectionLabelRangeList)
-    def __str__(self):
-        return "[" + ", ".join([str(c) for c in self.sectionLabelRangeList]) + "]"
-    def __repr__(self):
-        return "<SectionLabelSet:%s>"%str(self)
-    def containsSectionLabel(self,sectionLabel):
-        for range in self.sectionLabelRangeList:
-            if range.containsSectionLabel(sectionLabel):
-                return True
-            pass
-        return False
-    def possiblyContainsSectionLabel(self,sectionLabel):
-        for range in self.sectionLabelRangeList:
-            if range.possiblyContainsSectionLabel(sectionLabel):
-                return True
-            pass
-        return False
-    def isUniversal(self):
-        for range in self.sectionLabelRangeList:
-            if range.isUniversal():
-                return True
-            pass
-        return False
-    
-    def __cmp__(self,ls2):
-        if self.isUniversal():
-            if ls2.isUniversal():
-                return 0
-            else:
-                return 1
-            pass
-        else:
-            if ls2.isUniversal():
-                return -1
-            else:
-                return 0
-            pass
-        pass
-        
+        return self.start - self.end
 
-def makeRangeFromList(sLList):
-    list = [c for c in sLList]
-    list.sort()
-    return SectionLabelRange(start=min(list),end=max(list))
+    def __str__(self):
+        if self.start == -1: return "<Range: empty>"
+        return "<SectionInterval:"+ str(self.sectionData.numberToSL[self.start]) +"---"+ str(self.sectionData.numberToSL[self.end-1]) +">"
+
+class SectionLabelCollection(object):
+    """Class representing an arbitrary collection of sections, broken up into intervals."""
+    def __init__(self,sectionData,intervalList):
+        self.sectionData = sectionData
+        self.intervals = intervalList
+        return
+    def containsSL(self,sL):
+        """Returns True if the given section label is contained in the interval, otherwise False.
+        @type sL: SectionLabel
+        """
+        for interval in self.intervals:
+            if sL in interval: return True
+        return False
+    def __str__(self):
+        return "<SectionCollection:" + "".join(str(c) for c in self.intervals) + ">"
+    def __len__(self): return sum(len(c) for c in self.intervals)
+
+class UniversalSectionLabelCollection(object):
+    """Object that the whole range of sections in the Statute."""
+    def __init__(self,sectionData): self.sectionData = sectionData; return
+    def containsSL(self): return True
+    def __str__(self): return "<SectionUniversal>"
+    def __len__(self):
+        return len(self.sectionData.sectionList) * len(self.sectionData.sectionList) #amount that should be greater than the size of any non-universal collection

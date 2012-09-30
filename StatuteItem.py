@@ -26,6 +26,14 @@ class BaseItem(StatutePart):
         return
     def getStatute(self): return self.statute #statute with which item is associated
     def getIndentLevel(self): return self.parent.getIndentLevel()
+    def itemIterator(self):
+        """Returns an iterator over this item and all its subitems, depth first."""
+        yield self
+        for subitem in self.items:
+            for c in subitem.itemIterator(): yield c
+            pass
+        return
+
     def getLocationString(self):
         """Location of a BaseItem is given by its sectionLabel."""
         return self.getSectionLabel().getDisplayString()
@@ -75,6 +83,19 @@ class BaseItem(StatutePart):
             else: showError("Unknown tag: [" + repr(child) + "]", location=self)
             pass
         return
+    def __repr__(self):
+        return "<Item: "+self.getRawText()+">"
+    def getRawText(self,limit=500):
+        """Returns raw text of the item (used for debugging)."""
+        remainder = limit
+        l = []
+        for item in self.items:
+            l.append(item.getRawText(remainder))
+            remainder -= len(l[-1])
+            if remainder <= 0: break
+            pass
+        s = "".join(c for c in l)
+        return s[:limit]
 
 class SectionItem(BaseItem):
     """Class for a section / subsection / etc."""
@@ -125,7 +146,6 @@ class SectionItem(BaseItem):
 
     def finalizeSectionLabel(self):
         """Method that verifies and/or sets the SectionLabel object for the section by looking at the parent section label and the labelString provided for this object.  If the underlying node did not have a code attribute, a SectionLabel is simply constructed by appending the current label to the parent's SectionLabel."""
-        #TODO: Fill this in, so all can have sectionlabels!
         #create imputed SL from parent
         selfType = self.tree.tag  #derive the type of the new Numbering type to add to the label from the tag
         if selfType in formulaSectionMap: selfType = formulaSectionMap[selfType]
@@ -170,6 +190,10 @@ class SectionItem(BaseItem):
 
         if needForce and len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True #force a new paragraphs to start if not already accomplished by label string or marginal note
         return paragraphs
+    def getRawText(self,limit = 500):
+        s = BaseItem.getRawText(self,limit=limit)
+        if self.getLabelString() is not None: s = self.getLabelString() + " " + s
+        return s[:limit]
     pass
 
 class DefinitionItem(SectionItem):
@@ -181,6 +205,9 @@ class DefinitionItem(SectionItem):
         for item in self.items:
             if isinstance(item,TextItem): self.definedTerms += item.getDefinedTerms()
             pass
+        #TODO: should somehow reconcile the list of defined terms with the sections's SectionLabel object (in some cases they are inconsistent in the XML.
+        if self.sectionLabel.hasLastEmptyDefinition(): #show an error if we have an do defined term in the sectionLabel (except for repealed provisions, which we don't really care about.
+            if "repealed" not in self.getRawText(limit=100).lower(): showError("Empty definition.", location=self)
         return
 
     def extractMetaData(self):
@@ -205,14 +232,12 @@ class DefinitionItem(SectionItem):
         return paragraphs
     pass
 
-class FormulaItem(SectionItem):
+class FormulaItem(BaseItem):
     """Top level item for a formulagroup node.  Handles the initial formula. These items have "Formula" groups instead of Labels, and are at the same section label as preceding text (but force a new paragraph). The Formula sub-items are handled as ordinary sections."""
     def __init__(self, parent, tree):
-        BaseItem.__init__(self,parent,tree) #Hack --- not calling the right initializer for this object, we want SectionItem methods, but not all the initialization
-
+        BaseItem.__init__(self,parent,tree)
         self.marginalNote = None
         self.formulaString = None
-
         subsecs = self.extractMetaData()
         self.handleSubsections(subsecs)
         return
@@ -249,6 +274,9 @@ class FormulaItem(SectionItem):
         followers = self.getSubParagraphs(renderContext)
         if len(followers) > 0: followers[0].forceNewParagraph = True
         return paragraphs + followers
+
+    def getRawText(self,limit=500):
+        return self.formulaString
 
 class ReadAsItem(BaseItem):
     """Class representing a read-as text block. """
@@ -364,6 +392,8 @@ class TextItem(BaseItem):
         return self.definedTerms
     pass
 
+    def getRawText(self,limit = 500):
+        return self.text[:limit]
 
 #####
 #
