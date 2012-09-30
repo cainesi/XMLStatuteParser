@@ -335,7 +335,11 @@ class SectionData(object):
         @type sL2: SectionLabel
         """
         return self.sectionStart[sL1] <= self.sectionStart[sL2]
-    pass
+    def cmpSL(self,sL1,sL2):
+        if self.leSL(sL1,sL2):
+            if self.ltSL(sL1,sL2):return -1
+            return 0
+        return 1
 
     def getSectionItemFromString(self,sLString,locationItem=None,locationSL=None):
         """Returns the sectionItem references by the given string.  If location is provided, it will also try to match sectionLabel strings by combining stems from the location label's string with the specified string.  Returns None (and shows an error) if no matches can be found.

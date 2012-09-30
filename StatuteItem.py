@@ -85,6 +85,12 @@ class BaseItem(StatutePart):
         return
     def __repr__(self):
         return "<Item: "+self.getRawText()+">"
+    def getInitialTextItem(self):
+        """Returns the initial TextItem under this object.  Useful for grabbing the applicability provisions in a definition section.
+        @rtype: TextItem"""
+        for item in self.itemIterator():
+            if isinstance(item,TextItem): return item
+        return None
     def getRawText(self,limit=500):
         """Returns raw text of the item (used for debugging)."""
         remainder = limit
@@ -338,6 +344,7 @@ class TextItem(BaseItem):
 
     @staticmethod
     def isWrittenText(stack):
+        """Returns True if the item contains any text that should be visible in the output."""
         for tag in stack:
             if tag in textTriggers: return True
         return False
@@ -371,9 +378,13 @@ class TextItem(BaseItem):
                 self.processTree(tree=item,stack=stack) #otherwise recurse down to the contents of this item.
         stack.pop()
         return
+    def getText(self):
+        """Returns the undecorated text of this item."""
+        return self.text
+
     def getDecoratedText(self, renderContext):
         """Returns the items text, with the Decorator objects applied to the applicable portions."""
-        #self.decorators.sort() #todo, write code so that decorator list always sorted and never has overlaps?
+        self.decorators.sort() #todo, write code so that decorator list always sorted and never has overlaps?
         ptr = 0
         textList = []
         for dec in self.decorators:
@@ -390,7 +401,6 @@ class TextItem(BaseItem):
         return [Paragraph(text=self.getDecoratedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
     def getDefinedTerms(self):
         return self.definedTerms
-    pass
 
     def getRawText(self,limit = 500):
         return self.text[:limit]
@@ -461,7 +471,7 @@ class HeadingItem(StatutePart):
 
     def getLocationString(self):
         #TODO: Provide a string based on the heading information
-        return
+        return ""
 
 #####
 #
@@ -470,13 +480,13 @@ class HeadingItem(StatutePart):
 #####
 
 class Paragraph(object):
-    """Class for encapsulating a (part of a) paragraph of rendered text, along with logic for determining when paragraphs can be connected, and outputing final results."""
+    """Class for encapsulating a (part of a) paragraph of rendered text, along with logic for determining when paragraphs can be connected, and outputting final results."""
     def __init__(self,text, renderContext,indentLevel = 0,isMarginalNote = False, forceNewParagraph=False, softSpace=False):
         """text - the raw text of the paragraph
         renderContext
         indentLevel - level to which the text should be indented
         isMarginalNote - True if this paragraph should be rendered as a marginal note
-        forceNewParagraph - True if this paragraph should not be added to the end of the prior paragraph, even if at the same leve
+        forceNewParagraph - True if this paragraph should not be added to the end of the prior paragraph, even if at the same level
         softSpace - True if a space should be added to the end of this paragraph before merging with a alphanumeric-started paragraph."""
         self.text = text
         self.indentLevel = indentLevel

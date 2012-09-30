@@ -67,6 +67,7 @@ class Statute(object):
         self.processStatuteData(self.identTree) #extract meta-data about the statute from the xml
         self.processStatuteContents(self.contentTree) #extract the contents of the statute
         self.sectionData = SectionLabelLib.SectionData(statute=self)
+        self.definitionData = DefinitionData(statute=self)
         return
 
     ###
@@ -189,7 +190,6 @@ class Statute(object):
         self.segmentData.addSection(section.getSectionLabel())
         return
 
-
     ###
     #
     # File output methods.
@@ -207,6 +207,35 @@ class Statute(object):
         f.close()
         pass    
 
+    pass
+
+
+class DefinitionData(object):
+    """Object encapsulating information about defined terms in the Statute and their ranges of applicability."""
+    def __init__(self,statute):
+        """
+        @type statute: Statute
+        """
+        self.statute = statute
+        self.scopeDefinedTerms()
+        return
+
+    def scopeDefinedTerms(self):
+        """Determines the scope for defined terms appearing in the Statute."""
+        itemDict = {}
+        for item in self.statute.itemIterator():
+            parent = item.parent
+            if isinstance(item,StatuteItem.DefinitionItem): itemDict[parent.getSectionLabel()] = parent
+            pass
+        sLList = itemDict.keys()
+        sLList.sort(cmp=lambda x,y: self.statute.sectionData.cmpSL(x,y))
+        if sL in sLList:
+            item = itemDict[sL]
+            print("----")
+            print(sL)
+            print(item.getInitialItemItem().getText())
+
+        return
     pass
 
 def processAct(url):
