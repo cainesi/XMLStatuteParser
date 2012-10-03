@@ -312,7 +312,7 @@ class SectionData(object):
             else:
                 self.sectionStart[sL] = n
                 self.sectionEnd[sL] = n+1 #plus one, so we follow the usual python interval-convention
-                for superSL in sL.getSubLabels(): self.sectionEnd[superSL] = n+1
+                for superSL in sL.getSubLabels(): self.sectionEnd[superSL] = n+1 #TODO: should we use "parent" members of the section to trace up the list of supersection instead?  (worried that readas provisions might break this in some cases)
                 self.numberToSL[n] = sL
                 sLString = sL.getIDString()
                 if sLString in self.stringToSectionItem: showError("Repeated sectionlabel string representation ["+sLString+"]["+section.getRawText()+"]",location=section)

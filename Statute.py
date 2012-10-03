@@ -229,11 +229,11 @@ class DefinitionData(object):
             pass
         sLList = itemDict.keys()
         sLList.sort(cmp=lambda x,y: self.statute.sectionData.cmpSL(x,y))
-        if sL in sLList:
+        for sL in sLList:
             item = itemDict[sL]
             print("----")
             print(sL)
-            print(item.getInitialItemItem().getText())
+            print(item.getInitialTextItem().getText())
 
         return
     pass
