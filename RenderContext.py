@@ -100,7 +100,7 @@ class WikiContext(RenderContext):
     @staticmethod
     def renderExternalLink(targetURL,linkText=None):
         """renders a link to a url pointing outside of the wiki."""
-        if linkText == None: linkText = targetUrl
+        if linkText == None: linkText = targetURL
         return "[[%s|%s]]" % (targetURL, linkText)
     @staticmethod
     def renderAnchor(anchorTarget):
@@ -169,8 +169,8 @@ class HTMLContext(RenderContext):
     @staticmethod
     def renderExternalLink(targetURL,linkText=None):
         """renders a link to a url pointing outside of the wiki."""
-        if linkText == None: linkText = targetUrl
-        return "<a href=\"%s\">%s</a>" %(linkURL,linkText)
+        if linkText == None: linkText = targetURL
+        return "<a href=\"%s\">%s</a>" %(targetURL,linkText)
     @staticmethod
     def renderAnchor(anchorTarget):
         return "<a name=\"%s\"></a>"%anchorTarget

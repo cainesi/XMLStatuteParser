@@ -37,6 +37,8 @@ class Fragment(object):
     def __len__(self): return len(self.text)
     def __str__(self): return self.getText()
 
+#TODO: audit the code to make sure the saveState and discard/restoreState calls are balanced.
+
 class TextParse(object):
     def __init__(self, decoratedText):
         """Superclass for all the parsing classes. Implements the basic parsing steps which are relied on in subclasses.  One parameter, text, is the text to be handled by the parser.
@@ -125,6 +127,7 @@ class TextParse(object):
         self.saveState()
         con = self.eatConnector()
         if con is None: self.restoreState(); return None
+        self.eatSpace()
         frag = self.eatLabel()
         if frag is None: self.restoreState(); return None
         self.discardState()
@@ -141,12 +144,13 @@ class TextParse(object):
         if ty is None: self.restoreState(); return None
         frag = self.eatLabel()
         if frag is None: self.restoreState(); return None
+        self.discardState()
         while frag is not None:
             labelList.append(frag)
             frag = self.eatConnectorAndLabel()
             pass
         return labelList
-    def eatMultipleSeries(self):
+    def eatMultipleLabelSeries(self):
         """Eats a series of label series (e.g., "sections 4, and 7 and paragraph 3(b)
         @rtype: list of Fragment
         """
@@ -158,11 +162,23 @@ class TextParse(object):
             l = self.eatLabelSeries()
             pass
         return labelList
+    def eatNextLabelSeries(self):
+        """Eats to the start of a labelSeries, and then eats and returns the series.  Always eats at least the leading "section/subsection/etc" of the series that it hits."""
+        namem = sectionNamePat.search(self.ltext[self.ptr:])
+        if namem is None: return None
+        self.ptr += namem.start() #advance to the start of next labelSeries
+        labelList = self.eatLabelSeries() #eat series
+        return
+
     def addDecorators(self):
         """Adds required decorators to the underlying DecoratedText object."""
         return
 
 class ApplicationParse(TextParse):
+    #TODO - code to add decorators
+    #TODO - code to comprehend external references
+    #TODO - code to create applicability range objects
+    #TODO - code to find single-definition subsections
     """Parser that automatically eats the text to determine the applicability range."""
     initialPat = re.compile("^in|apply in|^for the purposes of|apply for the purposes of")
     thisPat = re.compile("this (?P<thisType>[a-z]+)")
@@ -187,7 +203,8 @@ class ApplicationParse(TextParse):
         if m is None: return None
         self.ptr += m.end()
         self.eatSpace()
-        return Fragment(m.group("thisType"),self.ptr+5)
+        if m.group("thisType") not in ["section","part","division","subdivision","act"]: showError("Unknown thisType: " + m.group("thisType"),location=self)
+        return Fragment(m.group("thisType"),self.ptr+5) #fragment only includes the part of the this-reference after "this"
     def eatApplicationRange(self):
         """Eats a series of "this" references and section label lists. Returns a tuple (list of section label fragments, list of this type fragments)"""
         while True:
@@ -206,6 +223,20 @@ class ApplicationParse(TextParse):
         return
     def getSectionLabelCollection(self):
         """Returns the SectionLabelCollection object describing the applicability range described in the text."""
+        return
+
+class SectionReferenceParse(TextParse):
+    """Finds all the local/external section references in text."""
+    def __init__(self, decoratedText):
+        TextParse.__init__(self,decoratedText)
+        self.thisList = [] #list of areas that are referred to as "this", such as "this section" or "this part"
+        self.localSectionList = [] #list of fragments for internal references
+        self.externalSectionList = [] #list of tuples (fragment, external resource) for external references
+        self.eatAllSectionReferences()
+        return
+
+    def eatAllSectionReferences(self):
+
         return
 
 

@@ -1,5 +1,7 @@
 # immediate TODOs:
-# - create a decoratedText superclass in the textutil class
+# - add indice tables to the Statute initializer (need to think how this will work -- parsing a statute/reg should also rebuild the indices for that instrument)
 # - find applicability of definitions
 # - parse & decorate for cross references
 # - parse & decorate for defined terms
+
+# X - create a decoratedText superclass in the textutil class

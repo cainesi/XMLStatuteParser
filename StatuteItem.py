@@ -337,8 +337,7 @@ class TextItem(BaseItem):
         self.decoratedText = self.firstPiece.assembleText()
         #self.text, self.decorators = self.firstPiece.assembleText()
         self.definedTerms = [] #list of defined terms appearing in this text block
-        #for p in self.firstPiece:  #TODO: instead of this, need to extract defined terms from the applicable decorators
-        #    if p.getDefinedTerm() != None: self.definedTerms.append(p.getDefinedTerm())
+        #TODO: extract defined terms from the applicable decorators
 
         return
 

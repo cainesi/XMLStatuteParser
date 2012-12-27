@@ -27,6 +27,17 @@ def commaSplit(u):
         pass
     return tokens
 
+#TODO code for quickly searching all relevant defined terms in text.
+
+class TermSeeker():
+    def __init__(self):
+        """Initialize the defined term seeker with information on the applicability of defined terms.  Used by the DefinitionData object."""
+        return
+    def find(self,text,position):
+        """Returns a list of all the defined terms that appear in the text, and their positions."""
+        return
+
+
 if __name__ == "__main__":
     #run tests of the methods
     l = commaSplit(u"abcd,dsfdfd\"sdfs,xxxx\",svsd")
