@@ -13,7 +13,7 @@ from ErrorReporter import showError
 import SectionLabelLib
 
 labelPat = re.compile("(" + "(\d+([a-zA-Z])?(\.\d+)?)(\([^\) ]{1,10}\))*" + "|" + "(\([^\) ]{1,10}\))+" + ")")
-connectorPat = re.compile("(?P<connector>to|and|,)")
+connectorPat = re.compile("(?P<connector>to|and( in)?|,)")
 sectionNamePat = re.compile("(?P<type>section|subsection|paragraph|clause|subclause)s?")
 
 class Fragment(object):
@@ -35,7 +35,7 @@ class Fragment(object):
     def setToConnected(self,toConnected): self.toConnected = toConnected; return
     def isToConnected(self): return self.toConnected #indicates whether fragment is linked to prior one by a "to"
     def __len__(self): return len(self.text)
-
+    def __str__(self): return self.getText()
 
 class TextParse(object):
     def __init__(self, decoratedText):
@@ -146,7 +146,6 @@ class TextParse(object):
             frag = self.eatConnectorAndLabel()
             pass
         return labelList
-
     def eatMultipleSeries(self):
         """Eats a series of label series (e.g., "sections 4, and 7 and paragraph 3(b)
         @rtype: list of Fragment
@@ -159,14 +158,51 @@ class TextParse(object):
             l = self.eatLabelSeries()
             pass
         return labelList
+    def addDecorators(self):
+        """Adds required decorators to the underlying DecoratedText object."""
+        return
 
 class ApplicationParse(TextParse):
+    """Parser that automatically eats the text to determine the applicability range."""
+    initialPat = re.compile("^in|apply in|^for the purposes of|apply for the purposes of")
+    thisPat = re.compile("this (?P<thisType>[a-z]+)")
     def __init__(self, decoratedText):
-        TextParse.__init__(decoratedText)
+        TextParse.__init__(self,decoratedText)
+        self.thisList = [] #list of areas that are referred to as "this", such as "this section" or "this part"
+        self.sectionList = []
+        self.eatStart()
+        #repeatedly eat labelSeries and this's, with connectors in between, until we have no more matches
+        self.eatApplicationRange()
         return
-    def findRangeStart(self):
+    def eatStart(self):
         """Finds the spot in the text that corresponds to the start of the applicability range."""
-
+        m = ApplicationParse.initialPat.search(self.ltext)
+        if m is None: return None
+        self.ptr=m.end()
+        self.eatSpace()
+        return m.group(0)
+    def eatThis(self):
+        """Eats the word "this" and the type of item "this" is referring to (section, division, etc.)"""
+        m = ApplicationParse.thisPat.match(self.ltext[self.ptr:])
+        if m is None: return None
+        self.ptr += m.end()
+        self.eatSpace()
+        return Fragment(m.group("thisType"),self.ptr+5)
+    def eatApplicationRange(self):
+        """Eats a series of "this" references and section label lists. Returns a tuple (list of section label fragments, list of this type fragments)"""
+        while True:
+            l = self.eatLabelSeries()
+            if l is not None: self.sectionList += l
+            else: #look for a this block
+                thisFrag = self.eatThis()
+                if thisFrag is None: showError("Could not find label list or this in expected spot in application language.",location=self.decoratedText); break
+                else: self.thisList.append(thisFrag)
+            con = self.eatConnector()
+            if con is None: break
+        return
+    def showParseData(self):
+        print(",".join(str(c) for c in self.sectionList))
+        print(",".join(str(c) for c in self.thisList))
         return
     def getSectionLabelCollection(self):
         """Returns the SectionLabelCollection object describing the applicability range described in the text."""
@@ -175,20 +211,21 @@ class ApplicationParse(TextParse):
 
 
 def doTests():
-    s = "12.3(14)(a)"
+    import DecoratedText
+    import Statute
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="12.3(14)(a)")
     t = TextParse(s)
     lab = t.eatLabel()
-    if lab != s: print "Error 1: [" + s + "] [" + lab + "]"
-    s ="Subsection 4.1"
+    if lab != s: print "Error 1: [" + s.getText() + "] [" + str(lab) + "]"
+    s =DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="Subsection 4.1")
     t = TextParse(s)
     labt = t.eatLabelType()
     lab = t.eatLabel()
-    if labt != "subsection": print "Error 2: [" + s + "] [" + labt + "]"
-    if lab != "4.1": print "Error 3: [" + s + "] [" + lab + "]"
-    s = "The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01) and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1)."
+    if labt != "subsection": print "Error 2: [" + s.getText() + "] [" + str(labt) + "]"
+    if lab != "4.1": print "Error 3: [" + s.getText() + "] [" + str(lab) + "]"
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01), this Part and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1).")
     t = ApplicationParse(s)
-    l = t.eatMultipleSeries()
-    print l
+    t.showParseData()
     return
 
 if __name__ == "__main__":

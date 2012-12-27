@@ -13,6 +13,7 @@ class DecoratorException(Exception): pass
 
 class DecoratedText(StatutePart):
     def __init__(self,parent,text,decorators=None):
+        """Initializer for Decorated Text."""
         StatutePart.__init__(self,parent=parent)
         self.text=text
         self.decorators = []

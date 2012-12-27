@@ -173,7 +173,6 @@ class Statute(object):
             #other cases
             else: print "Unknown tag seen at top level: [" + node.tag + "]"
             pass
-        #TODO structures pointing to sections by name, organizing them, etc.
         return
 
     def processSection(self,node):
@@ -221,6 +220,12 @@ class Statute(object):
     pass
 
 
+class DummyStatute(object):
+    def __init__(self):
+        """Dummy object used for testing by sections that need to declare a parent."""
+        return
+    def getStatute(self): return self
+
 class DefinitionData(object):
     """Object encapsulating information about defined terms in the Statute and their ranges of applicability."""
     def __init__(self,statute):
@@ -251,5 +256,5 @@ class DefinitionData(object):
 
 def processAct(url):
     """Method to grab the statute found at a specific url and automatically process it into wiki pages.  Ultimately it should automatically include any regulations"""
-    #TODO
+    #TODO - complete this code
     return

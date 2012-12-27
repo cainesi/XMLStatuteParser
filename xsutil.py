@@ -14,7 +14,7 @@ setupLibrary()
 def commaSplit(u):
     """method that splits a unicode string into comma separated pieces, ignoring commas appearing in quotes.  Returns a list of the comma-separated pieces."""
     strlen = len(u) #number of unicode characters
-    src = u.encode("utf-32")[4:] #convert to unicode, remove the initial 4-bytes (the endianness-indicator)
+    src = u.encode("utf-32")[4:] #convert to unicode byte-string, remove the initial 4-bytes (the endianness-indicator)
     #HACK - we could probably speed this up by not constantly reallocating the arrays each time function called?
     iarray = ( ctypes.c_int * (strlen + 1)) #maximum number of tokens we could possibly see
     tokenStart = iarray()
