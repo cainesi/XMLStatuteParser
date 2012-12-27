@@ -3,6 +3,7 @@ import os
 STATUTEDIR = os.path.expanduser("~/Data/Statutes")  #where statute xml files are found
 PAGEDIR = os.path.expanduser("~/Data/Pages")  #where the output wikipage should be stored
 LIBRARYDIR = os.path.expanduser("~/Data/XMLLibs") #where compile c modules will be located
+INDEXFILE = os.path.expanduser("~/Data/Statutes/sindex.pickle")
 
 #top level tags for ordinary sections handled by SectionItem (other than in formlas)
 sectionTypes = set(["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause","definition","formuladefinition"])
