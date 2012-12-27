@@ -1,3 +1,3 @@
 #!/bin/sh
 #gcc -DUSE_CHAR -shared -O3 -o bline.so bline.c
-gcc -shared -O3 -o xsutillib.so xsutillib.c
+gcc -shared -O3 -o `python libdir.py xsutillib.so` xsutillib.c
