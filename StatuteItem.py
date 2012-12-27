@@ -21,8 +21,8 @@ class BaseItem(StatutePart):
     """Superclass for all items in the statute text structure (*not* headings --- maybe I should rename it), with some general purpose methods of handling section labels, etc."""
     def __init__(self, parent, tree, statute = None):
         StatutePart.__init__(self,parent=parent,statute=statute)
-        self.tree = tree
-        self.items = []
+        self.tree = tree  #the top node in the tree corresponding to this item
+        self.items = []   #list of immediate subitems for this item
         return
     def getStatute(self): return self.statute #statute with which item is associated
     def getIndentLevel(self): return self.parent.getIndentLevel()
@@ -334,7 +334,8 @@ class TextItem(BaseItem):
         self.firstPiece = textutil.Piece(self,isSpaced=False) #dummy piece to start linked list
         self.lastPiece = self.firstPiece
         self.processTree(self.tree)
-        self.text, self.decorators = self.firstPiece.assembleText()
+        self.decoratedText = self.firstPiece.assembleText()
+        #self.text, self.decorators = self.firstPiece.assembleText()
         self.definedTerms = [] #list of defined terms appearing in this text block
         #for p in self.firstPiece:  #TODO: instead of this, need to extract defined terms from the applicable decorators
         #    if p.getDefinedTerm() != None: self.definedTerms.append(p.getDefinedTerm())
@@ -347,7 +348,6 @@ class TextItem(BaseItem):
         for tag in stack:
             if tag in textTriggers: return True
         return False
-
     def addPiece(self,piece):
         """Adds a new piece after the current last piece."""
         self.lastPiece.setNextPiece(piece)
@@ -378,31 +378,19 @@ class TextItem(BaseItem):
         stack.pop()
         return
     def getText(self):
-        """Returns the undecorated text of this item."""
-        return self.text
-
+        """Calls the getText method on the underlying DecoratedText object, returning the plain text contents."""
+        return self.decoratedText.getText()
     def getDecoratedText(self, renderContext):
-        """Returns the items text, with the Decorator objects applied to the applicable portions."""
-        self.decorators.sort() #TODO;, write code so that decorator list always sorted and never has overlaps?
-        ptr = 0
-        textList = []
-        for dec in self.decorators:
-            if dec.getStart() < ptr: raise StatuteException("Decorators out of order!")
-            textList.append(self.text[ptr:dec.getStart()])
-            textList.append(dec.getDecoratedText(renderContext=renderContext,textFull=self.text)) #TODO: should getDecorated text be told about the end of the pervious decoration and the start of the next one --- so it knows how much it can spread out?
-            ptr = dec.getEnd()
-            pass
-        textList.append(self.text[ptr:])
-        return u"".join(textList)
+        """Calls the getDecoratedText method on the underlying DecoratedText object, with the supplied RenderContext."""
+        return self.decoratedText.getDecoratedText(renderContext)
     def getParagraphs(self, renderContext, skipLabel = False):
         """Return the rendered text of this item bundled into a list of Paragraph objects."""
         indentLevel = self.getIndentLevel()
         return [Paragraph(text=self.getDecoratedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
     def getDefinedTerms(self):
         return self.definedTerms
-
     def getRawText(self,limit = 500):
-        return self.text[:limit]
+        return self.decoratedText.getText()[:limit]
 
 #####
 #

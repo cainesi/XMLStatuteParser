@@ -24,8 +24,9 @@ import SectionLabelLib
 #Data structures:
 # Statutes starts as XML
 # XML is fed into Statute object
-# Basic parser converts that to a tree structure (ITAItems), with nodes representing different type of elements in the statute (section labels, defintions, headings, text)
-# The tree is then walked to extract certain structural information about the statute:
+# Basic parser converts that to a tree structure (XMLStatParse Nodes), with nodes representing tags in the XML structure
+# The tree is then recursively walked by the Statute object and sub-trees encapsulated in appropriate StatuteItems (TextItem, FormulaItem, HeadingItem, etc.)
+# The structure of StatuteItems is then walked to extract certain data about the overall structure of the statute
 #       A) SegmentData - organization of sections into Parts/Divisions/etc
 #       B) SectionData - enumeration of sectionLabel items in the structure --- allows relative position of sections to be determined
 # (TODO) Each of the sections in the statute is walked in order to parse definitions, cross-references, etc.

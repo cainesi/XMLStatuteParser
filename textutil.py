@@ -11,7 +11,7 @@ Representation 2: The text of each paragraph is consolidated into a single strin
 
 from ErrorReporter import showError
 from StatutePart import StatutePart
-
+import DecoratedText
 
 #####
 #
@@ -116,7 +116,7 @@ class Piece(StatutePart):
     ###
     
     def assembleText(self):
-        """Returns a tuple (text, list of decorators) based on this piece and all following pieces in the list."""
+        """Returns a DecoratedText object based on this piece and all following pieces in the list."""
         textList = []
         decorators = []
         totLength = 0
@@ -129,10 +129,10 @@ class Piece(StatutePart):
             textList.append(text)
             totLength += len(text)
             if piece.hasTrailingSpace(): textList.append(u" "); totLength += 1
-        return (u"".join(textList),decorators)
+        return DecoratedText.DecoratedText(parent=self,text=u"".join(textList),decorators=decorators)
     
     def getTextAndDecorator(self):
-        """Returns a tuple (text, decorator) based just on this piece.""" #Should pieces be able to have multiple decorators?
+        """Returns a tuple (text, decorator) based on *just this* piece.""" #Should pieces be able to have multiple decorators?
         return (self.getUnspacedText(),self.decorator)
     pass
 
@@ -157,7 +157,7 @@ class TextPiece(Piece):
 class DefinedTermPiece(Piece):
     def __init__(self, parent, text, previousPiece=None,nextPiece=None):
         self.definedTerm = text
-        decorator = DefinedTermDecorator(parent=parent,start=1,end=1+len(self.definedTerm),definedTerm=self.definedTerm) #decoration should not include quotes
+        decorator = DecoratedText.DefinedTermDecorator(parent=parent,start=1,end=1+len(self.definedTerm),definedTerm=self.definedTerm) #decoration should not include quotes
         Piece.__init__(self,parent=parent,previousPiece=previousPiece,nextPiece=nextPiece,decorator = decorator)
         return
     def objName(self):
@@ -171,7 +171,7 @@ class DefinedTermPiece(Piece):
 class LinkPiece(Piece):
     """Class for a link in the text."""
     def __init__(self, parent,text, target = None,previousPiece=None,nextPiece=None):
-        decorator = LinkDecorator(parent=parent,start=0,end=len(text),target = target)
+        decorator = DecoratedText.LinkDecorator(parent=parent,start=0,end=len(text),target = target)
         Piece.__init__(self,parent=parent,previousPiece=previousPiece,nextPiece=nextPiece, decorator=decorator)
         self.text=text
         self.target=target
@@ -188,100 +188,3 @@ class LinkPiece(Piece):
         else: return self.previousEatsSpace()
     pass
 
-#####
-#
-# Decorators for text
-#
-#####
-
-class Decorator(StatutePart):
-    def __init__(self, parent, start, end):
-        StatutePart.__init__(self,parent=parent)
-        self.start = start
-        self.end = end
-        return
-    def __gt__(self,dec): return self.getStart() > dec.getStart() #ordering based on start positions
-    def __lt__(self,dec): return dec > self
-    def collide(self,dec):
-        """Returns True if the two decorators collide."""
-        if self.getStart() < dec.getStart():
-            if self.getEnd() > dec.getStart(): return True
-            else: return False
-        else:
-            if self.getStart() < dec.getEnd(): return True
-            else: return False
-            pass
-        pass
-    def includes(self,dec):
-        """Returns True if this decorator contains the other."""
-        if self.getStart() <= dec.getStart() and self.getEnd() >= dec.getEnd(): return True
-        return False
-    def rightShift(self,delta):
-        """Shift the Decorator by amount delta in the text (useful when other text is concatenated onto the start of the underlying string)"""
-        self.start += delta
-        self.end += delta
-    def getStart(self): return self.start
-    def getEnd(self): return self.end
-    def getDecoratedText(self,renderContext,textPiece=None, textFull=None):
-        """Returns the rendered text of this decorator.  Can either supply the full text, in which case the decorator will use it's start and end variables to extract the relevant portion, or the specific piece that should be rendered.
-        Default method simply returns raw text."""
-        if textPiece == None:
-            if textFull == None: showError("getDecoratedText called with no text",location=self); return u""
-            else: text = textFull[self.getStart():self.getEnd()]
-        else:
-            if textFull != None:
-                if textPiece != textFull[self.getStart():self.getEnd()]: showError("getDecoratedText called with inconsistent textFull and textPiece",location=self)
-            text = textPiece
-        return text
-
-class LinkDecorator(Decorator):
-    def __init__(self, parent,start,end,target):
-        Decorator.__init__(self,parent,start,end)
-        self.target = target #TODO: do something with the target! (also in DefinedTermDecorator)
-        return
-    def getDecoratedText(self,renderContext,textPiece=None,textFull=None):
-        text = Decorator.getDecoratedText(self,renderContext,textPiece=textPiece,textFull=textFull)
-        return text
-
-class DefinedTermDecorator(Decorator):
-    def __init__(self, parent,start,end,definedTerm,target=None):
-        Decorator.__init__(self,parent,start,end)
-        self.target = target
-        self.definedTerm = definedTerm
-        return
-    def getDefinedTerm(self): return self.definedTerm
-    def getDecoratedText(self,renderContext,textPiece=None,textFull=None):
-        text = Decorator.getDecoratedText(self,renderContext,textPiece=textPiece,textFull=textFull) #get the simple text
-        return renderContext.boldText(text)
-
-
-#####
-#
-# Various types of targets for Link Items
-#
-####
-
-class Target(object):
-    """Superclass for all types of link targets."""
-    def __init__(self, target): pass
-    pass
-
-class InternalTarget(Target):
-    """Link to another location within the current statutory instrument."""
-    def __init__(self, target): pass    
-    pass
-
-class ExternalTarget(Target):
-    """Target to another statutory instrument (another act, regulations, etc.)"""
-    def __init__(self, target): pass
-    pass
-
-class ChapterTarget(Target):
-    """Target to a chapter for the federal statutes (for historical notes.)"""
-    def __init__(self, target): pass
-    pass
-
-class BulletinTarget(Target):
-    """Target to a bulletin."""
-    def __init__(self, target): pass
-    pass

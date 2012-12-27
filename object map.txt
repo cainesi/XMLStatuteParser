@@ -1,0 +1,10 @@
+Map of the object/module hierarchy used by the statute parser
+
+TODO: finish this
+
+Statute
+    StatuteItem
+        textutil
+        DecoratedText
+        SectionLabelLib
+    RenderContext
