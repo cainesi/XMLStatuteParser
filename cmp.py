@@ -11,6 +11,7 @@ import Constants
 name = sys.argv[1]
 
 #empty comment
+#second comment
 
 replacements = [("&#8217;","'"), ("\xe2\x80\x99","'")] #do sort of cleaning newPages.py will do
 def clean(data):
