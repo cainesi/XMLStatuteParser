@@ -1,6 +1,13 @@
 # $Id$
 
-"""module for handling text and text decorators, used by the TextItem class in Statute."""
+"""module for handling text and text decorators, used by the TextItem class in Statute.
+
+There are two sets of objects representing two ways of representing text:
+Representation 1: text areas are broken up into separate objects (subclasses of Piece) matching the tag division boundaries within the XML representation.  The Piece objects contain logic for consolidating the text (e.g., of a paragraph) into a single block.  The representation is only transitory while the TextItem is being initialized.
+Representation 2: The text of each paragraph is consolidated into a single string within the TextItem, along with a set of Decorator objection.  Each decorator records a sort of notation that should be added to the text upon rendering, such as a cross-link --- this lets additional decorations to be added with lots of annoying object division.
+ """
+
+# TODO: instead of TextItem objections having a raw string and a list of Decorators, should there instead by a Decorated Text class that encapsulates both? (if so, fix above description)
 
 from ErrorReporter import showError
 from StatutePart import StatutePart
@@ -216,7 +223,8 @@ class Decorator(StatutePart):
     def getStart(self): return self.start
     def getEnd(self): return self.end
     def getDecoratedText(self,renderContext,textPiece=None, textFull=None):
-        """Returns the rendered text of this decorator.  Can either supply the full text, in which case the decorator will use it's start and end variables to extract the relevant portion, or the specific piece that should be rendered."""
+        """Returns the rendered text of this decorator.  Can either supply the full text, in which case the decorator will use it's start and end variables to extract the relevant portion, or the specific piece that should be rendered.
+        Default method simply returns raw text."""
         if textPiece == None:
             if textFull == None: showError("getDecoratedText called with no text",location=self); return u""
             else: text = textFull[self.getStart():self.getEnd()]
@@ -243,7 +251,7 @@ class DefinedTermDecorator(Decorator):
         return
     def getDefinedTerm(self): return self.definedTerm
     def getDecoratedText(self,renderContext,textPiece=None,textFull=None):
-        text = Decorator.getDecoratedText(self,renderContext,textPiece=textPiece,textFull=textFull)
+        text = Decorator.getDecoratedText(self,renderContext,textPiece=textPiece,textFull=textFull) #get the simple text
         return renderContext.boldText(text)
 
 

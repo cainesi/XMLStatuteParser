@@ -295,13 +295,14 @@ class SectionData(object):
         self.sectionStart - for each sL gives the number of appearance for the label
         self.sectionEnd - for each sL gives the appearance of the last section for which this section is a super-label
         self.stringToSection - for each string representation of a sL gives the corresponding sectionItem
+
         @type statute: Statute.Statute
         """
         self.statute = statute
         self.sectionList = [si for si in self.statute.sectionIterator()] #this will get us a list of all sections, in order
         self.sectionStart = {}
         self.sectionEnd = {} #the number of the last label under the given label
-        self.numberToSL = {}
+        self.numberToSL = {} #gives the SL corresponding to a specific label number
         self.stringToSectionItem = {}
         n = 0
         for section in self.sectionList: #asign a number to each section labeling

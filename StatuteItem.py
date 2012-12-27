@@ -335,7 +335,6 @@ class TextItem(BaseItem):
         self.lastPiece = self.firstPiece
         self.processTree(self.tree)
         self.text, self.decorators = self.firstPiece.assembleText()
-
         self.definedTerms = [] #list of defined terms appearing in this text block
         #for p in self.firstPiece:  #TODO: instead of this, need to extract defined terms from the applicable decorators
         #    if p.getDefinedTerm() != None: self.definedTerms.append(p.getDefinedTerm())
@@ -384,13 +383,13 @@ class TextItem(BaseItem):
 
     def getDecoratedText(self, renderContext):
         """Returns the items text, with the Decorator objects applied to the applicable portions."""
-        self.decorators.sort() #todo, write code so that decorator list always sorted and never has overlaps?
+        self.decorators.sort() #TODO;, write code so that decorator list always sorted and never has overlaps?
         ptr = 0
         textList = []
         for dec in self.decorators:
             if dec.getStart() < ptr: raise StatuteException("Decorators out of order!")
             textList.append(self.text[ptr:dec.getStart()])
-            textList.append(dec.getDecoratedText(renderContext=renderContext,textFull=self.text))
+            textList.append(dec.getDecoratedText(renderContext=renderContext,textFull=self.text)) #TODO: should getDecorated text be told about the end of the pervious decoration and the start of the next one --- so it knows how much it can spread out?
             ptr = dec.getEnd()
             pass
         textList.append(self.text[ptr:])
@@ -407,7 +406,7 @@ class TextItem(BaseItem):
 
 #####
 #
-# Object of handling headings
+# Object of handling headings (Parts, Divisions, Subdivisions of statutes)
 #
 #####
 

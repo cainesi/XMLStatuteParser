@@ -21,7 +21,19 @@ import SectionLabelLib
 # 5) Detect cross-references and insert applicable links
 # 6) Output wikipages
 
-#TODO:
+#Data structures:
+# Statutes starts as XML
+# XML is fed into Statute object
+# Basic parser converts that to a tree structure (ITAItems), with nodes representing different type of elements in the statute (section labels, defintions, headings, text)
+# The tree is then walked to extract certain structural information about the statute:
+#       A) SegmentData - organization of sections into Parts/Divisions/etc
+#       B) SectionData - enumeration of sectionLabel items in the structure --- allows relative position of sections to be determined
+# (TODO) Each of the sections in the statute is walked in order to parse definitions, cross-references, etc.
+# (TODO) The statute is bound against other statutes or dictionaries in order to resolve certain cross references, etc. (regs to statutes, etc)
+# wikipage/html output is generated
+
+
+# TODOs:
 # - convert to using proper xml parser - xml.parsers.expat (before the conversion gets too annoying! -- this will probably speed things up too, since expat is written in C)
 # - bump indent level when one forumladefinition is nested inside another?
 # - deal with headings in the statute / division identifications
@@ -29,7 +41,6 @@ import SectionLabelLib
 # - Move marginal notes that are attached to top level sections, when there are subsections in the section, and first subsection is un-noted.
 
 class StatuteException(Exception): pass
-
 
 class Statute(object):
     """Class that encapsulating a xml statute in a usable form.

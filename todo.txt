@@ -1,0 +1,5 @@
+# immediate TODOs:
+# - create a decoratedText superclass in the textutil class
+# - find applicability of definitions
+# - parse & decorate for cross references
+# - parse & decorate for defined terms
