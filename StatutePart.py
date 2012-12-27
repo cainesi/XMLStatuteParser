@@ -17,3 +17,6 @@ class StatutePart(object):
         """Method to describe the location of the object in the structure, to be overridden in subclasses."""
         return "No Location"
     def getStatute(self): return self.statute
+    def hasStatute(self):
+        if self.statute is None: return False
+        return True

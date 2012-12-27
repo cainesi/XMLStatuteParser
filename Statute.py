@@ -35,6 +35,7 @@ import SectionLabelLib
 
 
 # TODOs:
+# - add an index of look-up dictionaries of sectionLabels to the Statute object initialization, and generation of the indices from completed statute.
 # - convert to using proper xml parser - xml.parsers.expat (before the conversion gets too annoying! -- this will probably speed things up too, since expat is written in C)
 # - bump indent level when one forumladefinition is nested inside another?
 # - deal with headings in the statute / division identifications
@@ -69,7 +70,6 @@ class Statute(object):
             self.mainPart = dataTree["regulation"]
         else:
             raise StatuteException("Cannot find any instrument in file.")
-        
         self.sectionList = None #list of the top level section items in the Statute
         self.headingList = None #list of all headings in the Statute
         self.allItemList = None #list of all headings and sections in the order they occurred (useful for making TOC for statute)
@@ -217,8 +217,7 @@ class Statute(object):
         f = file(os.path.join(Constants.PAGEDIR, self.pagePrefix) + " " + lab,"w")
         f.write(sec.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()
-        pass    
-
+        return
     pass
 
 
@@ -234,19 +233,19 @@ class DefinitionData(object):
 
     def scopeDefinedTerms(self):
         """Determines the scope for defined terms appearing in the Statute."""
-        itemDict = {}
+        itemDict = {} # a dictionary of sections that are parents of definitions, indexed by sectionlabel
         for item in self.statute.itemIterator():
             parent = item.parent
             if isinstance(item,StatuteItem.DefinitionItem): itemDict[parent.getSectionLabel()] = parent
             pass
+
+        #output list of definition headers, for testing purposes
         sLList = itemDict.keys()
         sLList.sort(cmp=lambda x,y: self.statute.sectionData.cmpSL(x,y))
         for sL in sLList:
             item = itemDict[sL]
-            print("----")
             print(sL)
-            print(item.getInitialTextItem().getText())
-
+            print(item.getInitialTextItem().getText().encode("UTF-8"))
         return
     pass
 

@@ -7,7 +7,7 @@ Representation 1: text areas are broken up into separate objects (subclasses of 
 Representation 2: The text of each paragraph is consolidated into a single string within the TextItem, along with a set of Decorator objection.  Each decorator records a sort of notation that should be added to the text upon rendering, such as a cross-link --- this lets additional decorations to be added with lots of annoying object division.
  """
 
-# TODO: instead of TextItem objections having a raw string and a list of Decorators, should there instead by a Decorated Text class that encapsulates both? (if so, fix above description)
+#TODO: rename this this TextPieces module?
 
 from ErrorReporter import showError
 from StatutePart import StatutePart

@@ -401,6 +401,8 @@ class SectionLabelInterval(object):
     def __str__(self):
         if self.start == -1: return "<Range: empty>"
         return "<SectionInterval:"+ str(self.sectionData.numberToSL[self.start]) +"---"+ str(self.sectionData.numberToSL[self.end-1]) +">"
+    def __contains__(self,sL): return self.containsSL(sL)
+
 
 class SectionLabelCollection(object):
     """Class representing an arbitrary collection of sections, broken up into intervals."""
@@ -418,6 +420,7 @@ class SectionLabelCollection(object):
     def __str__(self):
         return "<SectionCollection:" + "".join(str(c) for c in self.intervals) + ">"
     def __len__(self): return sum(len(c) for c in self.intervals)
+    def __contains__(self,sL): return self.containsSL(sL)
 
 class UniversalSectionLabelCollection(object):
     """Object that the whole range of sections in the Statute."""
