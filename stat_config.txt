@@ -1,0 +1,19 @@
+# Statute configuration file
+# Stores information about the statutes that should be parsed
+#   Name: name of the statute, should be the first line of the definition for each statute
+#   Url: url where statute is located
+#   act: the name of the "Act" corresponding to the statute (i.e., if the instrument respresents regulations for a statute)
+#   reg: the name of the regulations for the statute
+#   fileonly: a statute that should not be downloaded, only rely on the version found on the file.
+# Each statute starts with a "Name" line
+# should be stored in the STATUTEDATADIR
+Name: "ITA"
+Url: "http://laws-lois.justice.gc.ca/eng/acts/I-3.3/"
+Reg: "IT Reg"
+
+Name: "IT Reg"
+Url: "http://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._945/"
+Act: "ITA"
+
+Name: "test1"
+Fileonly: "True"

@@ -1,9 +1,15 @@
 import os
 
-STATUTEDIR = os.path.expanduser("~/Data/Statutes")  #where statute xml files are found
-PAGEDIR = os.path.expanduser("~/Data/Pages")  #where the output wikipage should be stored
-LIBRARYDIR = os.path.expanduser("~/Data/XMLLibs") #where compile c modules will be located
-INDEXFILE = os.path.expanduser("~/Data/Statutes/sindex.pickle")
+HEADDIR = os.path.expanduser("~/Data")
+STATUTEDIR = os.path.join(HEADDIR,"Statutes")  #where statute xml files are found
+PAGEDIR = os.path.join(HEADDIR,"Pages")  #where the output wikipage should be stored
+LIBRARYDIR = os.path.join(HEADDIR,"XMLLibs") #where compile c modules will be located
+STATUTEDATADIR = os.path.join(HEADDIR, "StatuteData") #directory for information about statutes, used by StatuteIndex
+#STATUTECONFIGFILE = os.path.join(STATUTEDATADIR,"stat_config.txt")
+STATUTECONFIGFILE = "stat_config.txt"
+#TODO: implement logging old statutes
+OLDSTATUTEDIR = os.path.join(HEADDIR, "OldStatutes") #directory that stores old versions of statutes
+
 
 #top level tags for ordinary sections handled by SectionItem (other than in formlas)
 sectionTypes = set(["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause","definition","formuladefinition"])
