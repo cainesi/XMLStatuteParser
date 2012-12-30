@@ -7,6 +7,7 @@
 #   fileonly: a statute that should not be downloaded, only rely on the version found on the file.
 # Each statute starts with a "Name" line
 # should be stored in the STATUTEDATADIR
+
 Name: "ITA"
 Url: "http://laws-lois.justice.gc.ca/eng/acts/I-3.3/"
 Reg: "IT Reg"
