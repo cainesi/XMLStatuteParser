@@ -76,7 +76,7 @@ class TextParse(object):
         """Advance pointer to the first non-space."""
         while self.ptr < len(self.text) and self.text[self.ptr].isspace(): self.ptr += 1
         return
-    def eatParentheticals(self):
+    def eatParenthetical(self):
         """Eat space and any parentheticals"""
         self.eatSpace()
         if self.text[self.ptr] != "(": return
@@ -89,7 +89,7 @@ class TextParse(object):
             if pcount == 0: foundEnd == True; break
             if self.text[n].isspace(): spaceCount += 1
             pass
-        #return if we never found end, or if parentheses contained no space.
+        #return if we never found end, or if parentheses contained no space, then this is not something we can eat.
         if not foundEnd: return
         if spaceCount == 0: return
         #else update pointer to point after end of parentheses
@@ -239,6 +239,15 @@ class SectionReferenceParse(TextParse):
 
         return
 
+"""
+of this Act
+Act reference examples:
+of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952
+of the Excise Tax Act
+of the Foreign Publishers Advertising Services Act
+of the Bank Act
+"""
+
 
 
 def doTests():
@@ -254,7 +263,7 @@ def doTests():
     lab = t.eatLabel()
     if labt != "subsection": print "Error 2: [" + s.getText() + "] [" + str(labt) + "]"
     if lab != "4.1": print "Error 3: [" + s.getText() + "] [" + str(lab) + "]"
-    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01), this Part and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1).")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01), this Part and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1) and subsections 60(1), (2) and (3) of the Act and sections 40 and 50 of the Fisheries Act.")
     t = ApplicationParse(s)
     t.showParseData()
     return
