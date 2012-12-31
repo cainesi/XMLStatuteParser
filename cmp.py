@@ -18,10 +18,10 @@ def clean(data):
     for x,y in replacements: data = data.replace(x,y)
     return data
 
-f = file(os.path.join(Constants.WIKIDIR,name),"r")
+f = open(os.path.join(Constants.WIKIDIR,name),"r")
 newData = clean(f.read())
 f.close()
-f = file(os.path.join(Constants.CUR_WIKIDIR,name),"r")
+f = open(os.path.join(Constants.CUR_WIKIDIR,name),"r")
 oldData = clean(f.read())
 f.close()
 
@@ -30,7 +30,7 @@ f.close()
 #print "".join(l)
 hd = difflib.HtmlDiff(wrapcolumn=60)
 diffPage = hd.make_file(oldData.splitlines(),newData.splitlines())
-f = file("d.html","w")
+f = open("d.html","w")
 f.write(diffPage)
 f.close()
 

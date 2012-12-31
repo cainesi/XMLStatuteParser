@@ -1,17 +1,19 @@
 import os
 
 HEADDIR = os.path.expanduser("~/Data")
-STATUTEDIR = os.path.join(HEADDIR,"Statutes")  #where statute xml files are found
+STATUTEDIR = os.path.join(HEADDIR,"Statutes")  #where statute xml bundles are found
 PAGEDIR = os.path.join(HEADDIR,"Pages")  #where the output wikipage should be stored
 LIBRARYDIR = os.path.join(HEADDIR,"XMLLibs") #where compile c modules will be located
 STATUTEDATADIR = os.path.join(HEADDIR, "StatuteData") #directory for information about statutes, used by StatuteIndex
+RAWXMLDIR = os.path.join(HEADDIR,"RawXML")
+#TODO: look for "stat_config.txt" in correct location?
 #STATUTECONFIGFILE = os.path.join(STATUTEDATADIR,"stat_config.txt")
 STATUTECONFIGFILE = "stat_config.txt"
 #TODO: implement logging old statutes
 OLDSTATUTEDIR = os.path.join(HEADDIR, "OldStatutes") #directory that stores old versions of statutes
 
 
-#top level tags for ordinary sections handled by SectionItem (other than in formlas)
+#top level tags for ordinary sections handled by SectionItem (other than in formulas)
 sectionTypes = set(["section","subsection","paragraph","subparagraph","clause","subclause","subsubclause","definition","formuladefinition"])
 formulaSectionTypes = set(["formulaparagraph", "formulasubparagraph","formulaclause","formulasubclause", "formuladefinition"]) #top level tags for sections in formulas, need to have name translated to get correct label
 formulaSectionMap = {"formulaparagraph":"paragraph",      #mapping from the formula sections to ordinary section types

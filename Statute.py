@@ -213,7 +213,7 @@ class Statute(object):
         return
     def renderPage(self,sec):
         lab = sec.getSectionLabel()[0].getIDString()
-        f = file(os.path.join(Constants.PAGEDIR, self.pagePrefix) + " " + lab,"w")
+        f = open(os.path.join(Constants.PAGEDIR, self.pagePrefix) + " " + lab,"w")
         f.write(sec.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()
         return

@@ -16,5 +16,14 @@ Name: "IT Reg"
 Url: "http://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._945/"
 Act: "ITA"
 
+Name: "apca"
+Url: "http://laws-lois.justice.gc.ca/eng/acts/C-49/index.html"
+noCheck: ""
+
 Name: "test1"
-Fileonly: "True"
+Rawname: "ita14.xml"
+Fileonly: ""
+
+Name: "test2"
+Rawname: "xpca.xml"
+Fileonly: ""

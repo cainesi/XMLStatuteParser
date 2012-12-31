@@ -3,7 +3,7 @@ import XMLStatParse, Statute
 
 #FNAME = "Statutes/apca.xml"
 FNAME = "Statutes/ita.xml"
-f = file(FNAME,"r"); data = f.read(); f.close()
+f = open(FNAME,"r"); data = f.read(); f.close()
 p = XMLStatParse.XMLStatuteParser(data=data)
 t = p.getTree() #test 
 stat = Statute.Statute(data)

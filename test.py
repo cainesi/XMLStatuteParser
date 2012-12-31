@@ -26,7 +26,7 @@ fileList = [c for c in fileList if c[-4:].lower() == ".xml"]
 
 for name in fileList: #parse each file in turn
     print "== " + name + " =="
-    f = file(os.path.join(Constants.STATUTEDIR, name),"r"); data = f.read(); f.close()
+    f = open(os.path.join(Constants.STATUTEDIR, name),"r"); data = f.read(); f.close()
     st = Statute.Statute(data, verbose=True)
     st.renderPages()
     pass

@@ -32,10 +32,10 @@ for page in newPageList:
         print page
         changePages.append(page)
         continue
-    f = file(os.path.join(OLDPAGESDIR,page))
+    f = open(os.path.join(OLDPAGESDIR,page))
     oldPageData = f.read()
     f.close()
-    f = file(os.path.join(NEWPAGESDIR,page))
+    f = open(os.path.join(NEWPAGESDIR,page))
     newPageData = f.read()
     f.close()
     

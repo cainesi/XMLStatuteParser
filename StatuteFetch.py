@@ -10,23 +10,42 @@ xmlPat = re.compile("<a href=('|\")(?P<url>[^\">]*)('|\")>XML")
 
 def openStatute(fname):
     """Open a statute file and return the dictionary."""
-    f = file(fname,"r"); xstat = pickle.load(f); f.close()
+    f = open(fname,"rb"); xstat = pickle.load(f); f.close()
     return xstat
 
-def storeStatute(fname, url):
-    """Download and store statute to a specified file."""
-    xstat = fetchStatute(url)
-    f = file(fname,"w"); pickle.dump(xstat,f); f.close()
+def storeStatute(fname, url=None,sdict=None):
+    """Store statute to a specified file. Statute may be supplied by either url or a statue dictionary."""
+    if url is None and sdict is None: raise StatuteFetchException("storeStatute requires that either url or sdict be non-None.")
+    if sdict is not None: xstat = sdict
+    else: xstat = fetchStatute(url)
+    f = open(fname,"wb"); pickle.dump(xstat,f); f.close()
     return
+
+def packageFile(xmlname, fname):
+    """Takes an existing XML file and packages it into a bundle with dummy meta-data, also returns the resulting dictionary."""
+    f = open(xmlname,"r"); data = f.read(); f.close()
+    sdict = {}
+    sdict["DOWNLOAD"] = datetime.datetime.today()
+    sdict["CURRENCY"] = datetime.date.today()
+    sdict["AMEND"] = datetime.date.today()
+    sdict["XMLDATA"] = data
+    sdict["URL"] = "XXX"
+    sdict["XMLURL"] = "XXX"
+    storeStatute(fname,sdict=sdict)
+    return sdict
 
 def isStatuteUpdated(fname):
     """Checks whether a statute has accumulated any further amendments."""
     statDict = openStatute(fname)
     url = statDict["URL"]
     newDict = readStatutePage(url)
-    if newDict["AMEND"] > statDict["AMEND"]: return True
-    elif newDict["AMEND"] == statDict["AMEND"]: return False
-    elif newDict["AMEND"] < statDict["AMEND"]: print("WARNING: Lastest statute has less current amendments than stored."); return True
+    return statDictUpdated(statDict, newDict)
+
+def isStatDictUpdated(oldDict, newDict):
+    """Compares to statute meta-data dictionaries and determines if the second is strictly more recent."""
+    if newDict["AMEND"] > oldDict["AMEND"]: return True
+    elif newDict["AMEND"] == oldDict["AMEND"]: return False
+    elif newDict["AMEND"] < oldDict["AMEND"]: print("WARNING: Lastest statute has less current amendments than stored."); return True
     else:
         print("WARNING: Lastest statute has less current amendments than stored.")
         return False

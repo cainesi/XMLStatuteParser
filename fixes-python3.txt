@@ -1,0 +1,7 @@
+Things I will need to do to get this working with python 3
+
+- division of integers can now return a float -- "//" is integer division
+- cmp keyword of sort functions is one (looks like one place will need this fixed in SectionLabelLib
+- unicode / str fixes --- hopefully most of the content is being handled as unicode anyway?
+    - see -- http://python3porting.com/problems.html
+    - b"xyz" is now used for creating byte literals
