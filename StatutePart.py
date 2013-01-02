@@ -16,7 +16,16 @@ class StatutePart(object):
     def getLocationString(self):
         """Method to describe the location of the object in the structure, to be overridden in subclasses."""
         return "No Location"
-    def getStatute(self): return self.statute
+    def getSectionLabel(self):
+        """Returns the sL for this part of the Statute, but tracing up the train of parents until a parent. Overridden in subclasses"""
+        if hasattr(self.parent, "getSectionLabel"): return self.parent.getSectionLabel()
+        else: return None
+    def getStatute(self):
+        """
+        @rtype: Statute.Statute
+        """
+        return self.statute
     def hasStatute(self):
+        """@rtype: bool"""
         if self.statute is None: return False
         return True

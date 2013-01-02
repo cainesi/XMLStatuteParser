@@ -1,7 +1,12 @@
-# immediate TODOs:
-# - add indice tables to the Statute initializer (need to think how this will work -- parsing a statute/reg should also rebuild the indices for that instrument)
-# - find applicability of definitions
-# - parse & decorate for cross references
-# - parse & decorate for defined terms
+# Rewrite Statute object so that instead of raw data it takes a StatuteIndex instance and the name of a statute to process
+# Rewrite test.py so that it is based on statute names as specified in stat_config.txt
+# X - written, not tested - Code in langutil that relies on Statute's sectionData in order to create applicability object
+# Code in StatuteIndex to convert series of Fragments into references (if references can be found).
+# Code to add decorators for other section references
+# Code to add decorators for defined terms
+# Confirm that page output working correctly
 
-# X - create a decoratedText superclass in the textutil class
+# Code for tables of contents for each instrument
+# Code to add disclaimer footer on each page
+# Code to add decorators for historical notes (should be able to lift this from prior project)
+# Code to add tables of referencing sections / regulations (have the decorators store the target sectionLabel/instrument as well as the page/anchor, so that we can walk the decorators and find cross-refernces; or have the StatuteIndex keep track of the cross-links as they are querried?).

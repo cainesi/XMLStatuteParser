@@ -10,7 +10,7 @@ import Constants
 #fileList = os.listdir("Statutes") #full test
 #fileList = ["apca.xml","excise_act.xml","ita13.xml","ita14.xml"] #representative ita section
 #fileList = ["ita14.xml"]
-fileList = ["ita.xml"]
+#fileList = ["ita.xml"]
 #fileList = ["bank.xml"]
 #fileList = ["excise_act.xml"]
 

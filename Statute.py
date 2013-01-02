@@ -88,7 +88,6 @@ class Statute(object):
     #
     ###
 
-
     def titleString(self):
         """String giving the title of the statute (mainly for debugging)."""
         return ": " + self.longTitle + " (a/k/a " + self.shortTitle + ") " + self.getCitationString()
@@ -135,6 +134,25 @@ class Statute(object):
         for item in self.itemIterator():
             if isinstance(item,StatuteItem.SectionItem): yield item
         return
+    ###
+    #
+    # Meta-data about the Statute
+    #
+    ###
+    def getSectionData(self):
+        """
+        Returns SectionData object for statute, containing list of section labels and their ordering.
+        @rtype: SectionLabelLib.SectionData
+        """
+        return self.sectionData
+
+    def getSegmentData(self):
+        """
+        Returns segmentData (information of parts/divisions/subdivisions) for the Statute.
+        @rtype: SectionLabelLib.SegmentData
+        """
+        return self.segmentData
+
 
     ###
     #

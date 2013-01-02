@@ -255,7 +255,7 @@ class SegmentData:
         self.currentSubdivision = None
         self.segmentList = []
         self.segmentTitle = {} #dictionary indexed by Segment, giving segment's title
-        self.containingSegment = {} #dictionary indexed by sectional label, giving the most narrowest Segment the section is in
+        self.containingSegment = {} #dictionary indexed by sectional label, giving the most narrow Segment the section is in
         self.segmentContents = {} #dictionary providing a set of sections in each segment of the statute
         self.segmentContents[Segment([])] = set([]) #these two entries are dumping grounds for sections that are not in a Segment at all, or do not have a division / subdivision / etc
         self.segmentContents[None] = set([])
@@ -394,13 +394,19 @@ class SectionLabelInterval(object):
         n = self.sectionData[sL]
         if n >= self.start and n < self.end: return True
         return False
+    def expandAround(self,sL):
+        """Returns a new SectionLabelInterval which includes the range of this interval and the specified sL."""
+
+
+
+        return newInterval
 
     def __len__(self):
         return self.start - self.end
 
     def __str__(self):
         if self.start == -1: return "<Range: empty>"
-        return "<SectionInterval:"+ str(self.sectionData.numberToSL[self.start]) +"---"+ str(self.sectionData.numberToSL[self.end-1]) +">"
+        return "<SectionInterval: "+ str(self.sectionData.numberToSL[self.start]) +" [#"+str(self.start) +"]---"+ str(self.sectionData.numberToSL[self.end-1]) +" [#"+str(self.end) +"]>"
     def __contains__(self,sL): return self.containsSL(sL)
 
 
@@ -418,7 +424,7 @@ class SectionLabelCollection(object):
             if sL in interval: return True
         return False
     def __str__(self):
-        return "<SectionCollection:" + "".join(str(c) for c in self.intervals) + ">"
+        return "<SectionCollection:" + "\n\t".join(str(c) for c in self.intervals) + ">"
     def __len__(self): return sum(len(c) for c in self.intervals)
     def __contains__(self,sL): return self.containsSL(sL)
 
