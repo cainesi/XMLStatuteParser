@@ -84,8 +84,11 @@ class Statute(object):
         self.contentTree = self.mainPart["body"]
         self.processStatuteData(self.identTree) #extract meta-data about the statute from the xml
         self.processStatuteContents(self.contentTree) #extract the contents of the statute
-        self.sectionData = SectionLabelLib.SectionData(statute=self)
-        self.definitionData = DefinitionData(statute=self)
+        self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
+        #TODO: put some form of sectionData into the self.statuteData object
+        #TODO: insert decorations for section cross-references
+
+        self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
         return
 
     ###

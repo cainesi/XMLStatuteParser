@@ -11,7 +11,7 @@ __author__ = 'caines'
 
 
 import pickle, shutil, re, os, datetime
-import Constants, StatuteFetch, Statute
+import Constants, StatuteFetch, Statute, SectionLabelLib
 from ErrorReporter import showError
 
 class StatuteIndexException(Exception): pass
@@ -112,7 +112,7 @@ class StatuteData(object):
         self.reg = reg
         self.url = url
         self.fileOnly = fileOnly
-        self.bundle = None
+        self.bundle = None #the statute bundle for this statute, is set once loaded
         self.rawName = None #filename where XML content can be located on disk (only useful if fileOnly is set)
         self.noCheck = False #if True, then url will not be check if xml already available locally
         self.indexLoaded = False #Set to True once indexes have been loaded from file, if loading is successful
@@ -141,30 +141,6 @@ class StatuteData(object):
     def setRawName(self,rawName):
         self.rawName = rawName
         return
-    def setSLDict(self,sLDict):
-        """Sets the sLDict for this statute."""
-        self.slDict = sLDict
-        return
-    def setSectionNameDict(self,sectionNameDict):
-        """Sets the sectionNameDict for this statute."""
-        self.sectionNameDict = sectionNameDict
-        return
-    def setLinks(self, linksDict):
-        """Set the linksDict for this Statute."""
-        self.linksDict = linksDict
-        return
-    def setIndices(self, sLDict=None,sectionNameDict=None,linksDict=None):
-        """Set all the indices for statute at once, and store to file."""
-        #TODO
-        self.storeIndices()
-        return
-    def getIndexName(self):
-        """Returns the filename where indices for this statute are stored."""
-        return os.path.join(Constants.STATUTEDATADIR, self.name + ".index")
-    def storeIndices(self):
-        """Causes the index information in the file to be stored to the appropriate file."""
-        #TODO
-        return
     def setFileOnly(self, fileOnly = True):
         """Set fileOnly (i.e., not to be fetched from url) flag for this statute, default to True."""
         self.fileOnly = fileOnly
@@ -184,7 +160,6 @@ class StatuteData(object):
     def getAmendDate(self): self.getBundle(); return self.bundle["AMEND"]
     def getCurrencyDate(self): self.getBundle(); return self.bundle["CURRENCY"]
     def getDownloadDate(self): self.getBundle(); return self.bundle["DOWNLOAD"].date()
-
     def getBundle(self, forceFetch = False):
         """Returns bundle for the statute.  If bundle had to be loaded from url, a copy is saved to local file.  When fetching, checks if a more recent version is posted.
         forceFetch - force retrieving XML from url
@@ -222,6 +197,74 @@ class StatuteData(object):
             pass
         self.bundle = bundle
         return self.bundle
+
+    ###
+    #
+    # Methods for working with Statute metadata
+    #
+    ###
+
+    def setSLDict(self,sLDict):
+        """Sets the sLDict for this statute."""
+        self.slDict = sLDict
+        return
+    def setSectionNameDict(self,sectionNameDict):
+        """Sets the sectionNameDict for this statute."""
+        self.sectionNameDict = sectionNameDict
+        return
+    def setLinks(self, linksDict):
+        """Set the linksDict for this Statute."""
+        self.linksDict = linksDict
+        return
+    def setIndices(self, sLDict=None,sectionNameDict=None,linksDict=None):
+        """Set all the indices for statute at once, and store to file."""
+        #TODO
+        self.storeIndices()
+        return
+    def getIndexName(self):
+        """Returns the filename where indices for this statute are stored."""
+        return os.path.join(Constants.STATUTEDATADIR, self.name + ".index")
+    def storeIndices(self):
+        """Causes the index information in the file to be stored to the appropriate file."""
+        f = file(self.getIndexName,"wb"); pickle.dump((self.slDict,self.sectionNameDict,self.linksDict),f); f.close()
+        return
+    def loadIndices(self):
+        """Loads all the indices for the statute from the disk. If no indices file is found, sets the indices to empty dictionaries, and shows a warning."""
+        if not os.path.exists(self.getIndexName()):
+            showError("["+self.name+"] Could not find index file for statute")
+        else:
+            try:
+                f = file(self.getIndexName(),"rb"); self.slDict, self.sectionNameDict, self.linksDict = pickle.load(f); f.close()
+            except IOError:
+                showError("["+self.name+"] Error opening index file for statute")
+                pass
+            pass
+        if self.slDict is None: showError("["+self.name+"] No slDict, setting to {}"); self.slDict = {}
+        if self.sectionNameDict is None: showError("[" + self.name + "] No sectionNameDict, setting to {}"); self.sectionNameDict = {}
+        if self.linksDict is None: showError("[" + self.name + "] No linksDict, setting to {}"); self.linksDict = {}
+        return
+    def getSLFromString(self,sLString,locationSL=None):
+        """Returns the SL (if any) represented by the string in the Statute.  If locationSL is specified, and the sLString is not found in the label dictionary, then additional searches are made pre-pending portions of locationSL.
+        @rtype: SectionLabelLib.SectionLabel
+        """
+        if self.sectionNameDict is None: showError("Call to getSLFromString before self.sectionNameDict is set. Loading indices."); self.loadIndices()
+        if sLString in self.sectionNameDict: return self.sectionNameDict[sLString]
+        if locationSL is None: showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "]"); return None
+
+        for subLabel in locationSL.getSubLabels():
+            #print(">>" + subLabel.getIDString() + sLString)
+            if (subLabel.getIDString() + sLString) in self.sectionNameDict: return self.sectionNameDict[subLabel.getIDString() + sLString]
+            pass
+        showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "] [hint:"+locationSL.getIDString()+"]")
+        return None
+    def getLinkTupleFromString(self, sLString, locationSL):
+        """Returns a tuple (sL, page name string, anchor string) for the given sectionLabel string in this statute.  Returns None, None, None if nothing found."""
+        sL = self.getSLFromString(sLString=sLString, locationSL=locationSL)
+        if sL is None: return (None,None,None)
+        #TODO fill in rest
+
+        return
+
     pass
 
 

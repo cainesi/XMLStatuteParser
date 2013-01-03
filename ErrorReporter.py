@@ -4,7 +4,7 @@ import sys
 
 class StrictException(Exception): pass
 
-STRICT = False
+STRICT = False #set to True to force an exception upon any warning message.
 def showError(s, header = "WARNING", location = None):
     if location is not None:
         while True:

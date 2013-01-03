@@ -187,6 +187,9 @@ class TextParse(object):
             if nextWord == "Act": self.discardState(); return " ".join(actWords)
             nextWord = self.eatWord()
             pass
+
+        #TODO: add code to handle "Income Tax Application Rules" (and maybe other names ending in "Rules"?)
+
         showError("Unknown \"of\" type: no closing \"Act\": " + str(actWords), location = self.decoratedText)
         self.restoreState()
         return None
