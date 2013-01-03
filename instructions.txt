@@ -1,0 +1,7 @@
+The program requires python2.7 and a c-compiler to compile an included library..
+
+To setup the required directory structure and compile libraries run "python setup.py".  This will setup certain directories under a "Data" directory in your home directory. The directory locations are specified in the Constants.py file.
+
+Configuration information about the statutes to be parsed is included in the stat_config.txt file.  The use of the configuration file is described in comments within that file.
+
+Once setup and configured, run "python XXXX" to parse the actual statutes.  Output files will be placed in the "Pages" subdirectory under "Data". [To expand -- will we automatically determine changed pages?]
