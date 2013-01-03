@@ -47,7 +47,8 @@ class StatuteException(Exception): pass
 class Statute(object):
     """Class that encapsulating a xml statute in a usable form.
     Based on the XMLStatuteParser, but processes the raw tree output to make it more usable."""
-    def __init__(self,data,verbose=False):
+    #def __init__(self,data,verbose=False):
+    def __init__(self,statuteName, statuteIndex, verbose=False):
         """
         Initialize Statute object based on it's raw XML representation.
         Metadata about the Statute is stored in following members:
@@ -56,6 +57,11 @@ class Statute(object):
         sectionData - contains information about the sections in the Statute, their text-searchable representations and their orderings.
         instrumentType - gives the type of instrument represented by the object -- currently just "statute" and "regulation"
         """
+        self.statuteName = statuteName
+        self.statuteIndex = statuteIndex
+        self.statuteData = self.statuteIndex[self.statuteName]
+        data = self.statuteData.getRawXML()
+
         p = XMLStatParse.XMLStatuteParser()
         p.feed(data)
         dataTree = p.getTree()
@@ -226,13 +232,15 @@ class Statute(object):
     ###
 
     def renderPages(self): #TODO: this code is just a stop-gap for testing purposes
-        for sec in self.sectionList:
-            self.renderPage(sec)
+        """Renders a page for each top-level sectionItems."""
+        for sectionItem in self.sectionList:
+            self.renderPage(sectionItem)
         return
-    def renderPage(self,sec):
-        lab = sec.getSectionLabel()[0].getIDString()
+    def renderPage(self,sectionItem):
+        """Renders the page for a sectionItem (assumed to be top-level)."""
+        lab = sectionItem.getSectionLabel()[0].getIDString()
         f = open(os.path.join(Constants.PAGEDIR, self.pagePrefix) + " " + lab,"w")
-        f.write(sec.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
+        f.write(sectionItem.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()
         return
     pass

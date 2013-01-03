@@ -1,6 +1,7 @@
-# Rewrite Statute object so that instead of raw data it takes a StatuteIndex instance and the name of a statute to process
-# Rewrite test.py so that it is based on statute names as specified in stat_config.txt
+# X - Rewrite Statute object so that instead of raw data it takes a StatuteIndex instance and the name of a statute to process
+# X - Rewrite test.py so that it is based on statute names as specified in stat_config.txt
 # X - written, not tested - Code in langutil that relies on Statute's sectionData in order to create applicability object
+# Write code to store certain information on statue labels into StatuteData Object.
 # Code in StatuteIndex to convert series of Fragments into references (if references can be found).
 # Code to add decorators for other section references
 # Code to add decorators for defined terms

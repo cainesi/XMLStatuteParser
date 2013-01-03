@@ -2,6 +2,8 @@
 
 import urllib2, urlparse, re, datetime, pickle
 
+allowedKeys = ["DOWNLOAD", "CURRENCY", "AMEND", "XMLDATA","URL","XMLURL"] #this are the only keys that should appear in a statute bundle
+
 class StatuteFetchException(Exception): pass
 
 currentToPat = re.compile("current to (?P<date>(?P<year>\d\d\d\d)-(?P<month>\d+)-(?P<day>\d+))")
@@ -68,7 +70,7 @@ def fetchStatute(url,amendDate=None, priorVersion=None):
     if amendDate != None:
         if statDict["AMEND"] <= amendDate: return None
 
-    statDict["DATA"] = urllib2.urlopen(statDict["XMLURL"]).read()
+    statDict["XMLDATA"] = urllib2.urlopen(statDict["XMLURL"]).read()
     return statDict
 
 def readStatutePage(url):

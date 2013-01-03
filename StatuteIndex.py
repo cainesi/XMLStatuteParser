@@ -11,7 +11,8 @@ __author__ = 'caines'
 
 
 import pickle, shutil, re, os, datetime
-import Constants, StatuteFetch
+import Constants, StatuteFetch, Statute
+from ErrorReporter import showError
 
 class StatuteIndexException(Exception): pass
 linePat = re.compile("(?P<tag>[^:]*):\s*\"(?P<value>[^\"]*)\"")
@@ -45,7 +46,7 @@ class StatuteIndex(object):
         for line in lines:
             lineno += 1
             tag, value = processLine(line)
-            print((tag, value))
+            #print((tag, value))
 
             if tag is None: continue
             elif tag == "name":
@@ -70,8 +71,14 @@ class StatuteIndex(object):
         self.statuteDataDict[name] = statuteData
         return
     def getStatuteData(self,name):
-        """Returns the StatuteData object for the named statute."""
+        """Returns the StatuteData object for the named statute.
+        @rtype: StatuteData"""
         return self.statuteDataDict[name]
+    def getStatute(self,name):
+        """Returns the Statute object representing the parsed statute.
+        @rtype: Statute.Statute
+        """
+        return Statute.Statute(statuteName=name,statuteIndex=self)
     def __getitem__(self,name):
         """Allow StatuteData objects to be fetched with [] notation."""
         return self.getStatuteData(name)
@@ -105,6 +112,7 @@ class StatuteData(object):
         self.reg = reg
         self.url = url
         self.fileOnly = fileOnly
+        self.bundle = None
         self.rawName = None #filename where XML content can be located on disk (only useful if fileOnly is set)
         self.noCheck = False #if True, then url will not be check if xml already available locally
         self.indexLoaded = False #Set to True once indexes have been loaded from file, if loading is successful
@@ -171,37 +179,49 @@ class StatuteData(object):
     def getBundleBackupName(self):
         """Returns the filename for a current back of the statue bundle."""
         return os.path.join(Constants.OLDSTATUTEDIR,self.name + ".bundle" + "-" + datetime.datetime.today().strftime("%Y-%m-%d+%Hh-%Mm-%Ss"))
+    def getRawXML(self): self.getBundle(); return self.bundle["XMLDATA"]
+    def getURL(self): self.getBundle(); return self.bundle["URL"]
+    def getAmendDate(self): self.getBundle(); return self.bundle["AMEND"]
+    def getCurrencyDate(self): self.getBundle(); return self.bundle["CURRENCY"]
+    def getDownloadDate(self): self.getBundle(); return self.bundle["DOWNLOAD"].date()
+
     def getBundle(self, forceFetch = False):
         """Returns bundle for the statute.  If bundle had to be loaded from url, a copy is saved to local file.  When fetching, checks if a more recent version is posted.
         forceFetch - force retrieving XML from url
         updateCheck - if statute has been retrieved from file, check if update version online (default True)
         """
+        if self.bundle is not None: return self.bundle
+
         fname = self.getBundleName()
         #try to open file:
         bundle = None
         try:
             bundle = StatuteFetch.openStatute(fname)
         except IOError:
-            #file not available, package from rawXML if possible, otherwise raise exception.
-            if self.fileOnly:
+            if self.fileOnly: #if file not available *and* we only want file, then package from rawXML if possible, otherwise raise exception.
                 if self.rawName is None: raise StatuteIndexException("Error on forced read from file [" + self.name + "]")
-                bundle = StatuteFetch.packageFile(os.path.join(Constants.RAWXMLDIR,self.rawName),fname)
-                return bundle
+                showError("Not statute file, attempting to package raw XML ["+self.name+"].",header="LOADING")
+                self.bundle = StatuteFetch.packageFile(os.path.join(Constants.RAWXMLDIR,self.rawName),fname)
+                return self.bundle
             pass
         readNew = False #have we read new XML data from the internet?
         if (bundle is None) or forceFetch: #nothing so far, so definitely need to read from url (or being forced to)
+            showError("No file, fetching from url ["+self.name+"].",header="LOADING")
             bundle = StatuteFetch.fetchStatute(self.getUrl())
             readNew = True
             pass
         elif not self.noCheck: #we have the bundle locally, only check url if updateCheck is set
+            showError("File present, checking for update ["+self.name+"].",header="LOADING")
             newData = StatuteFetch.readStatutePage(self.getUrl())
-            if StatuteFetch.isStatDictUpdated(bundle,newData): bundle = StatuteFetch.fetchStatute(self.getUrl()); readNew = True
+            if StatuteFetch.isStatDictUpdated(bundle,newData): showError("Update found, loading from url ["+self.name+"].",header="LOADING"); bundle = StatuteFetch.fetchStatute(self.getUrl()); readNew = True
             pass
         else: pass
-        if readNew: #if we have output a new bundle to the disk
+        if readNew: #if we have read a new statute from url, output a copy of bundle to back directory
             StatuteFetch.storeStatute(fname,sdict=bundle)
             StatuteFetch.storeStatute(self.getBundleBackupName(),sdict=bundle)
-        return bundle
+            pass
+        self.bundle = bundle
+        return self.bundle
     pass
 
 
