@@ -36,7 +36,7 @@ class DecoratedText(StatutePart):
     def getText(self):
         """Returns the raw text underlying the DecoratedText."""
         return self.text
-    def getDecoratedText(self, renderContext):
+    def getRenderedText(self, renderContext):
         """Returns the items text, with the Decorator objects applied to the applicable portions."""
         self.decorators.sort()
         ptr = 0
@@ -44,7 +44,7 @@ class DecoratedText(StatutePart):
         for dec in self.decorators:
             if dec.getStart() < ptr: raise DecoratorException("Decorators out of order!")
             textList.append(self.text[ptr:dec.getStart()])
-            textList.append(dec.getDecoratedText(renderContext=renderContext,textFull=self.text)) #TODO: should getDecoratedText on each decoration be told about the end of the previous decoration and the start of the next one --- so it knows how much it can spread out? (e.g., so that links can be spread out to cover whole words?)
+            textList.append(dec.getRenderedText(renderContext=renderContext,textFull=self.text)) #TODO: should getDecoratedText on each decoration be told about the end of the previous decoration and the start of the next one --- so it knows how much it can spread out? (e.g., so that links can be spread out to cover whole words?)
             ptr = dec.getEnd()
             pass
         textList.append(self.text[ptr:])
@@ -84,7 +84,7 @@ class Decorator(StatutePart):
         self.end += delta
     def getStart(self): return self.start
     def getEnd(self): return self.end
-    def getDecoratedText(self,renderContext,textPiece=None, textFull=None):
+    def getRenderedText(self,renderContext,textPiece=None, textFull=None):
         """Returns the rendered text of this decorator.  Can either supply the full text, in which case the decorator will use it's start and end variables to extract the relevant portion, or the specific piece that should be rendered.
         Default method simply returns raw text."""
         if textPiece == None:
@@ -101,8 +101,8 @@ class LinkDecorator(Decorator):
         Decorator.__init__(self,parent,start,end)
         self.target = target #TODO: do something with the target! (also in DefinedTermDecorator)
         return
-    def getDecoratedText(self,renderContext,textPiece=None,textFull=None):
-        text = Decorator.getDecoratedText(self,renderContext,textPiece=textPiece,textFull=textFull)
+    def getRenderedText(self,renderContext,textPiece=None,textFull=None):
+        text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull)
         return text
 
 class DefinedTermDecorator(Decorator):
@@ -112,8 +112,8 @@ class DefinedTermDecorator(Decorator):
         self.definedTerm = definedTerm
         return
     def getDefinedTerm(self): return self.definedTerm
-    def getDecoratedText(self,renderContext,textPiece=None,textFull=None):
-        text = Decorator.getDecoratedText(self,renderContext,textPiece=textPiece,textFull=textFull) #get the simple text
+    def getRenderedText(self,renderContext,textPiece=None,textFull=None):
+        text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull) #get the simple text
         return renderContext.boldText(text)
 
 #####

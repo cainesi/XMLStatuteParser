@@ -17,6 +17,7 @@ for statName in statList: #parse each file in turn
     #print("==" + (" " * (len(s)-4)))
     print("=" * len(s))
     st = si.getStatute(name=statName)
+    st.doProcess()
     st.renderPages()
     pass
 

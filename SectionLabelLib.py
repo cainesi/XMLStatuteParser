@@ -361,6 +361,17 @@ class SectionData(object):
         showError("Could not find item for ["+sLString+"][hint:"+locationSL.getIDString()+"]")
         return None
 
+    def getSLFromString(self,sLString,locationItem=None, locationSL=None):
+        """Returns the SL referenced by teh given string in this Statute, or None if there is None.
+        @type sLString: unicode
+        @type locationSL: SectionLabel
+        @type locationItem: StatuteItem.SectionItem
+        @rtype: SectionLabel
+        """
+        tmp = self.getSectionItemFromString(sLString,locationItem,locationSL)
+        if tmp is None: return tmp
+        return tmp.getSectionLabel()
+
     def getSectionInterval(self,sLList):
         return SectionLabelInterval(self,sLList)
 
@@ -370,6 +381,12 @@ class SectionData(object):
 
     def getUniversalCollection(self):
         return UniversalSectionLabelCollection(self)
+
+    def getSectionNameDict(self):
+        """Returns a dictionary mapping section label strings to the corresponding SLs for this statute."""
+        snDict = {}
+        for sectionName in self.stringToSectionItem: snDict[sectionName] = self.stringToSectionItem[sectionName].getSectionLabel()
+        return snDict
 
 class SectionLabelInterval(object):
     """Class representing a contiguous interval of sections."""
@@ -435,3 +452,19 @@ class UniversalSectionLabelCollection(object):
     def __str__(self): return "<SectionUniversal>"
     def __len__(self):
         return len(self.sectionData.sectionList) * len(self.sectionData.sectionList) #amount that should be greater than the size of any non-universal collection
+
+class Pinpoint(object):
+    """Object that encapsulates the location of a citation (page and anchor strings)."""
+    def __init__(self, sL, page, anchor):
+        """
+        @type page: str
+        @type anchor: str
+        """
+        self.sL = sL
+        self.page = page
+        self.anchor = anchor
+        return
+    def getSL(self): return self.sL
+    def getPage(self): return self.page
+    def getAnchor(self): return self.anchor
+    def __str__(self): return "|" + str(self.sL) + "|" + self.page + "|" + self.anchor + "|"

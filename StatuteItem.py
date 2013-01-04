@@ -377,15 +377,21 @@ class TextItem(BaseItem):
         stack.pop()
         return
     def getText(self):
-        """Calls the getText method on the underlying DecoratedText object, returning the plain text contents."""
+        """Calls the getText method on the underlying DecoratedText object, returning the plain text contents.
+        @rtype: DecoratedText.DecoratedText"""
         return self.decoratedText.getText()
-    def getDecoratedText(self, renderContext):
+    def getDecoratedText(self):
+        """
+        @rtype: DecoratedText.DecoratedText
+        """
+        return self.decoratedText
+    def getRenderedText(self, renderContext):
         """Calls the getDecoratedText method on the underlying DecoratedText object, with the supplied RenderContext."""
-        return self.decoratedText.getDecoratedText(renderContext)
+        return self.decoratedText.getRenderedText(renderContext)
     def getParagraphs(self, renderContext, skipLabel = False):
         """Return the rendered text of this item bundled into a list of Paragraph objects."""
         indentLevel = self.getIndentLevel()
-        return [Paragraph(text=self.getDecoratedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
+        return [Paragraph(text=self.getRenderedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
     def getDefinedTerms(self):
         return self.definedTerms
     def getRawText(self,limit = 500):

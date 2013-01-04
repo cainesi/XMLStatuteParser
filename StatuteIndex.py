@@ -51,7 +51,7 @@ class StatuteIndex(object):
             if tag is None: continue
             elif tag == "name":
                 if value in self.statuteDataDict: raise StatuteIndexException("Error in " + Constants.STATUTECONFIGFILE +", duplicate definition of name [line:" + str(lineno) + "][" + line + "]")
-                curStat = StatuteData(value)
+                curStat = StatuteData(index=self,name=value)
                 self.statuteDataDict[value] = curStat
                 pass
             elif curStat is None: raise StatuteIndexException("Error in " + Constants.STATUTECONFIGFILE +", value specified before any name [line:" + str(lineno) + "][" + line + "]")
@@ -72,6 +72,7 @@ class StatuteIndex(object):
         return
     def getStatuteData(self,name):
         """Returns the StatuteData object for the named statute.
+        @type name: str
         @rtype: StatuteData"""
         return self.statuteDataDict[name]
     def getStatute(self,name):
@@ -80,7 +81,11 @@ class StatuteIndex(object):
         """
         return Statute.Statute(statuteName=name,statuteIndex=self)
     def __getitem__(self,name):
-        """Allow StatuteData objects to be fetched with [] notation."""
+        """Allow StatuteData objects to be fetched with [] notation.
+        @type statuteName: str
+        @type statuteIndex: StatuteIndex
+        @rtype: StatuteData
+        """
         return self.getStatuteData(name)
     def getLinksToSection(self,name,sL):
         """Returns a list of all sections, from any source, linking to a specified sL (or sub-sL of that sL) the named statute."""
@@ -94,7 +99,7 @@ class StatuteIndex(object):
 
 class StatuteData(object):
     """Class for storing metadata about a statute."""
-    def __init__(self,name,prefix=None,url=None,act=None,reg=None, fileOnly=False):
+    def __init__(self,index,name,prefix=None,url=None,act=None,reg=None, fileOnly=False):
         """
         name - the name of statute (serves as the key by which it is accessed in all these methods
         prefix - prefix used for pages of this statute, by default equal to name
@@ -104,6 +109,7 @@ class StatuteData(object):
         fileOnly - if True, this statute should only be loaded from disk, not the internet
         """
         #following contain metadata about the section contents of the statute and should be updated each time the statute is parsed.
+        self.index = index
         self.name = name
         self.prefix = prefix
         if self.prefix is None: self.prefix = self.name #set prefix to name, if not otherwise set
@@ -117,7 +123,7 @@ class StatuteData(object):
         self.noCheck = False #if True, then url will not be check if xml already available locally
         self.indexLoaded = False #Set to True once indexes have been loaded from file, if loading is successful
         self.sLDict = None #dictionary indexed by sL objects of sections in this statute
-        self.sectionNameDict = None #dictionary indexed by the string labels of sections in this statute
+        self.sectionNameDict = None #dictionary indexed by the string labels of sections in this statute, and pointing to SLs
         self.linksDict = None #dictionary of external links -- indexed by external statute name, then by target sL, then a list of source sLs in this Statute.
         return
     def __str__(self): return "<StatuteData: name:["+ str(self.name)+"] url:["+str(self.url)+"]>"
@@ -257,14 +263,43 @@ class StatuteData(object):
             pass
         showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "] [hint:"+locationSL.getIDString()+"]")
         return None
-    def getLinkTupleFromString(self, sLString, locationSL):
-        """Returns a tuple (sL, page name string, anchor string) for the given sectionLabel string in this statute.  Returns None, None, None if nothing found."""
+    def getPinpointFromString(self, sLString, locationSL):
+        """Returns a Pinpoint object for the given sectionLabel string in this statute.  Returns None, None, None if nothing found.
+        @type sLString: str
+        @type locationSL: SectionLabelLib.SectionLabel
+        @rtype: SectionLabelLib.Pinpoint
+        """
         sL = self.getSLFromString(sLString=sLString, locationSL=locationSL)
-        if sL is None: return (None,None,None)
-        #TODO fill in rest
-
+        if sL is None: return None
+        return SectionLabelLib.Pinpoint(sL=sL, page=self.getPageName(sL),anchor=self.getAnchor(sL))
+    def getPageName(self,sL):
+        """
+        @type sL: SectionLabelLib.SectionLabel
+        @rtype: str
+        """
+        return self.prefix + " " + sL[0].getIDString()
+    def getAnchor(self,sL):
+        """
+        @type sL: SectionLabelLib.SectionLabel
+        @type: str
+        """
+        return sL[1:].getIDString()
+    def pinpointFragmentList(self, fragmentList, locationSL):
+        """
+        Takes a list of fragments, determines their sectionlabels, and marks them with pinpoints in place.
+        @type fragmentList: list of langutil.Fragment
+        @type locationSL: SectionLabelLib.SectionLabel
+        @return:
+        """
+        curSL = locationSL
+        for frag in fragmentList:
+            pinpoint = self.getPinpointFromString(sLString=frag.getText(),locationSL = curSL)
+            if pinpoint is not None:
+                curSL = pinpoint.getSL()
+                frag.setPinpoint(pinpoint)
+                pass
+            pass
         return
-
     pass
 
 

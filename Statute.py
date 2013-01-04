@@ -2,11 +2,10 @@
 # $URL$
 
 import os
+import Constants, SectionLabelLib
 import XMLStatParse
+import StatuteItem, langutil
 import RenderContext
-import StatuteItem
-import Constants
-import SectionLabelLib
 
 #workflow for parsing statute:
 # 1) parse xml into tree structure
@@ -84,10 +83,14 @@ class Statute(object):
         self.contentTree = self.mainPart["body"]
         self.processStatuteData(self.identTree) #extract meta-data about the statute from the xml
         self.processStatuteContents(self.contentTree) #extract the contents of the statute
+        return
+    #TODO, after testing, make the following part of the initialization (we've separated it out so that object can be assigned before this code is run)
+    def doProcess(self):
         self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
+        self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
         #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
-
+        self.markSectionReferences() #detect section references in text, and decorate them
         self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
         return
 
@@ -148,6 +151,13 @@ class Statute(object):
     # Meta-data about the Statute
     #
     ###
+    def getStatuteIndex(self):
+        """@rtype: StatuteIndex.StatuteIndex"""
+        return self.statuteIndex
+    def getStatuteData(self):
+        """@rtype: StatuteIndex.StatuteData"""
+        return self.statuteData
+
     def getSectionData(self):
         """
         Returns SectionData object for statute, containing list of section labels and their ordering.
@@ -230,6 +240,24 @@ class Statute(object):
 
     ###
     #
+    # Methods for decorating contents
+    #
+    ###
+
+    def markSectionReferences(self):
+        """Marks all the section references in the Statute."""
+        for item in self.itemIterator():
+            parent = item.parent
+            if isinstance(item,StatuteItem.TextItem):
+                dt = item.getDecoratedText()
+                print(dt.getText())
+                sr = langutil.SectionReferenceParse(dt)
+                sr.addDecorators()
+            pass
+        return
+
+    ###
+    #
     # File output methods.
     #
     ###
@@ -248,7 +276,6 @@ class Statute(object):
         return
     pass
 
-
 class DummyStatute(object):
     def __init__(self):
         """Dummy object used for testing by sections that need to declare a parent."""
@@ -256,7 +283,7 @@ class DummyStatute(object):
     def getStatute(self): return self
 
 class DefinitionData(object):
-    """Object encapsulating information about defined terms in the Statute and their ranges of applicability."""
+    """Object encapsulating information about defined terms in the Statute and their ranges of applicability. And also code for marking the defined terms in the Statute once applicabilities have been determined."""
     def __init__(self,statute):
         """
         @type statute: Statute
