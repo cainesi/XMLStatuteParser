@@ -360,9 +360,9 @@ class TextItem(BaseItem):
             if item.tag == "definedtermen":
                 self.addPiece(textutil.DefinedTermPiece(parent=self,text=item.getRawText().strip()))
             elif item.tag == "xrefexternal":
-                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),target=None))
+                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),pinpoint=None))
             elif item.tag =="xrefinternal":
-                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),target=None))
+                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),pinpoint=None))
             elif isinstance(item,XMLStatParse.TextNode):  #TextNode correspond to text in the xml file.  Only include if we are inside aof <Text> tags.
                 txt = item.getRawText().strip() #to strip off leading/trailing spaces / new lines
                 if txt == "": continue

@@ -455,16 +455,23 @@ class UniversalSectionLabelCollection(object):
 
 class Pinpoint(object):
     """Object that encapsulates the location of a citation (page and anchor strings)."""
-    def __init__(self, sL, page, anchor):
+    def __init__(self, statuteName, sL, page, anchor):
         """
+        @type statuteName: str
+        @type sL: SectionLabel
         @type page: str
         @type anchor: str
         """
+        self.statuteName = statuteName
         self.sL = sL
         self.page = page
         self.anchor = anchor
         return
+    def getStatuteName(self): return self.statuteName
     def getSL(self): return self.sL
     def getPage(self): return self.page
     def getAnchor(self): return self.anchor
+    def getText(self):
+        """Returns a string that should represent the pinpoint in text."""
+        return self.sL.getIDString()
     def __str__(self): return "|" + str(self.sL) + "|" + self.page + "|" + self.anchor + "|"

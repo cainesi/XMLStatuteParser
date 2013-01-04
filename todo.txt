@@ -9,6 +9,7 @@
 # Code to add decorators for other section references
 # Code to add decorators for defined terms
 # Confirm that page output working correctly
+# Code to allow one Decorator to override overlapping decorators when added (for example, if the existing decorator doesn't have a pinpoint object)
 
 # Code for tables of contents for each instrument
 # Code to add disclaimer footer on each page

@@ -97,13 +97,20 @@ class Decorator(StatutePart):
         return text
 
 class LinkDecorator(Decorator):
-    def __init__(self, parent,start,end,target):
+    def __init__(self, parent,start,end,pinpoint):
+        """Object representing a link to a pinpoint location.
+        @type start: int
+        @type end: int
+        @type pinpoint: SectionLabelList.Pinpoint
+        @return:
+        """
         Decorator.__init__(self,parent,start,end)
-        self.target = target #TODO: do something with the target! (also in DefinedTermDecorator)
+        self.pinpoint = pinpoint
         return
     def getRenderedText(self,renderContext,textPiece=None,textFull=None):
-        text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull)
-        return text
+        text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull) #text to be decorated
+        if self.pinpoint is None: return text #return plain text, unless we have a target #TODO, maybe we should mark the text as a failed decorator?
+        return RenderContext
 
 class DefinedTermDecorator(Decorator):
     def __init__(self, parent,start,end,definedTerm,target=None):

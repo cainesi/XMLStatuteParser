@@ -35,6 +35,10 @@ class RenderContext:
     def renderPlainText(classobj, text, level = 0): #for legacy code referencing renderPlainText
         return classobj.indentText(text,level)
     @staticmethod
+    def renderPinpoint(pinpoint, text=None):
+        return ""
+    #TODO: following two methods are redundant now that renderPinpoint has been added.
+    @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):
         return ""
     @staticmethod
@@ -87,6 +91,12 @@ class WikiContext(RenderContext):
     @staticmethod
     def indentText(text, level = 0):
         return ">" * level + " " + text
+    @staticmethod
+    def renderPinpoint(pinpoint, text=None):
+        if text is None: linkText = pinpoint.getText()
+        else: linkText = text
+        targetString = pinpoint.getPage() + "#" + pinpoint.getAnchor()
+        return "[[" + targetString+ "|" +linkText + "]]"
     @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):
         """renders a link in the current context. targetSection is the section to link to, targetAnchor is the anchor in the section, linkText is the text of the link."""

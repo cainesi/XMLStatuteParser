@@ -271,7 +271,7 @@ class StatuteData(object):
         """
         sL = self.getSLFromString(sLString=sLString, locationSL=locationSL)
         if sL is None: return None
-        return SectionLabelLib.Pinpoint(sL=sL, page=self.getPageName(sL),anchor=self.getAnchor(sL))
+        return SectionLabelLib.Pinpoint(statuteName=self.name, sL=sL, page=self.getPageName(sL),anchor=self.getAnchor(sL))
     def getPageName(self,sL):
         """
         @type sL: SectionLabelLib.SectionLabel

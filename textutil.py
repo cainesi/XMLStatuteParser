@@ -170,11 +170,11 @@ class DefinedTermPiece(Piece):
 
 class LinkPiece(Piece):
     """Class for a link in the text."""
-    def __init__(self, parent,text, target = None,previousPiece=None,nextPiece=None):
-        decorator = DecoratedText.LinkDecorator(parent=parent,start=0,end=len(text),target = target)
+    def __init__(self, parent,text, pinpoint = None,previousPiece=None,nextPiece=None):
+        decorator = DecoratedText.LinkDecorator(parent=parent,start=0,end=len(text),pinpoint =  pinpoint)
         Piece.__init__(self,parent=parent,previousPiece=previousPiece,nextPiece=nextPiece, decorator=decorator)
         self.text=text
-        self.target=target
+        self.pinpoint=pinpoint
         return
     def objName(self):
         return u"<LinkPiece: [" + self.text + "]>"
