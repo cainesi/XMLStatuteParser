@@ -250,7 +250,7 @@ class Statute(object):
             parent = item.parent
             if isinstance(item,StatuteItem.TextItem):
                 dt = item.getDecoratedText()
-                print(dt.getText())
+                #print(dt.getText())
                 sr = langutil.SectionReferenceParse(dt)
                 sr.addDecorators()
             pass
@@ -270,7 +270,7 @@ class Statute(object):
     def renderPage(self,sectionItem):
         """Renders the page for a sectionItem (assumed to be top-level)."""
         lab = sectionItem.getSectionLabel()[0].getIDString()
-        f = open(os.path.join(Constants.PAGEDIR, self.pagePrefix) + " " + lab,"w")
+        f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab,"w")
         f.write(sectionItem.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
         f.close()
         return

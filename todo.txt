@@ -10,6 +10,8 @@
 # Code to add decorators for defined terms
 # Confirm that page output working correctly
 # Code to allow one Decorator to override overlapping decorators when added (for example, if the existing decorator doesn't have a pinpoint object)
+# have historical notes handled as a subclass of TextItems rather than as a field of SectionItems, or at least represent them as a DecoratedText object so that they can be marked-up with cross refernces to the implementing/amending legislation.
+
 
 # Code for tables of contents for each instrument
 # Code to add disclaimer footer on each page

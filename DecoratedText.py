@@ -110,7 +110,7 @@ class LinkDecorator(Decorator):
     def getRenderedText(self,renderContext,textPiece=None,textFull=None):
         text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull) #text to be decorated
         if self.pinpoint is None: return text #return plain text, unless we have a target #TODO, maybe we should mark the text as a failed decorator?
-        return RenderContext
+        return renderContext.renderPinpoint(pinpoint=self.pinpoint,text=text)
 
 class DefinedTermDecorator(Decorator):
     def __init__(self, parent,start,end,definedTerm,target=None):

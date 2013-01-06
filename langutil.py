@@ -11,12 +11,16 @@ How this will work
 import re
 from ErrorReporter import showError
 import SectionLabelLib
+import DecoratedText
+
+class LangUtilException(Exception): pass
 
 labelPat = re.compile("(" + "(\d+([a-zA-Z])?(\.\d+)?)(\([^\) ]{1,10}\))*" + "|" + "(\([^\) ]{1,10}\))+" + ")")
-connectorPat = re.compile("(?P<connector>to|and( in)?|,)")
+connectorPat = re.compile("(?P<connector>to|and( in)?|or|,)")
 sectionNamePat = re.compile("(?P<type>section|subsection|paragraph|clause|subclause)s?")
 wordPat = re.compile(" *(?P<word>[a-zA-Z]+)\s*")
 punctuationPat = re.compile("(?P<punctuation>\.|,)\s*")
+quotePat = re.compile(" *\"(?P<phrase>[^\"]*)\"")
 
 class Fragment(object):
     """class representing a fragment of text, along with it's position in the parent text block."""
@@ -67,6 +71,42 @@ class Fragment(object):
     def __len__(self): return len(self.text)
     def __str__(self): return self.getText()
 
+class LabelLocation(object):
+    """Class for encapsulating information about where a label points to (locally within the current act, another act, regulations, within a definition."""
+    def __init__(self,local=False, actName=None,definition=None,definitionSectionFragment=None):
+        """
+        Object can be initialized in three ways: by specifying that reference is local, by giving the name of Act pointed to, or by giving the definition that is being referred to
+        @type local: bool
+        @type actName: str
+        @type definition: str
+        @type definitionSectionFragment: Fragment
+        """
+        self.local=False
+        self.actName = None
+        self.definition=None
+        self.definitionSectionFragment=None
+        if local == True: self.local = True
+        elif actName is not None: self.actName = actName
+        else:
+            if (definition is None) or (definitionSectionFragment is None): raise LangUtilException("Reflection must specify one of local, actName or definition/definitionSection.")
+            self.definition=definition; self.definitionSectionFragment=definitionSectionFragment
+            pass
+        return
+    def __str__(self):
+        if self.local: return "LOCAL"
+        elif self.actName is not None: return self.actName
+        else: return "\"" + self.definition + "\" in " + self.definitionSectionFragment.getText()
+    def isDefinitionRef(self):
+        if self.definition is not None: return True
+        return False
+    def isLocal(self): return self.local
+    def isActRef(self):
+        if self.actName is not None: return True
+        return False
+    def getActName(self): return self.actName
+    def getDefinition(self): return self.definition
+    def getDefinitionSectionFragment(self): return self.definitionSectionFragment
+
 #TODO: audit the code to make sure the saveState and discard/restoreState calls are balanced.
 
 class TextParse(object):
@@ -102,6 +142,23 @@ class TextParse(object):
         return
     def getMatches(self, matchType):
         return self.matches[matchType]
+
+    ###
+    #
+    # Methods to manipulate underlying DecoratedText
+    #
+    ###
+    def addLinkDecorator(self, fragment):
+        """Adds required decorators to the underlying DecoratedText object.
+        @type: fragment: Fragment"""
+        self.decoratedText.addDecorator(DecoratedText.LinkDecorator(parent=self.decoratedText,start=fragment.getStart(),end=fragment.getEnd(),pinpoint=fragment.getPinpoint()))
+        return
+    ###
+    #
+    # Functions to parse/eat parts of text
+    #
+    ###
+
     def eatSpace(self):
         """Advance pointer to the first non-space."""
         while self.ptr < len(self.text) and self.text[self.ptr].isspace(): self.ptr += 1
@@ -177,6 +234,22 @@ class TextParse(object):
         self.eatSpace()
         if con == "to": frag.setToConnected(True)
         return frag
+    def eatDefinitionAndSection(self):
+        """Eat text of the form ["defined term" in subsection 248(1)].
+        @rtype: LabelLocation
+        """
+        self.saveState()
+        m = quotePat.match(self.ltext,self.ptr)
+        if m is None: self.restoreState(); return None
+        defTerm = m.group("phrase")
+        self.ptr = m.end()
+        nextWord = self.eatWord()
+        if nextWord != "in": self.restoreState(); return None
+        t = self.eatLabelType()
+        if t is None: self.restoreState(); return None
+        labString = self.eatLabel()
+        if labString is None: self.restoreState(); return None
+        return LabelLocation(definition=defTerm, definitionSectionFragment=labString)
     def eatActLocation(self):
         """
         Attempts to eat a description of the location that the sections are drawn from, such as from the list below:
@@ -187,40 +260,47 @@ class TextParse(object):
             of the Foreign Publishers Advertising Services Act
             of the Bank Act
         If one can be found, it is returned without the leading "of" (and the leading "the", if present), otherwise returns None (i.e., "local" --- "this Act" also causes this to be the return).  Detection of the name is highly heurisical.
+        @rtype: LabelLocation
         """
         self.saveState()
         #check for word "of", if not present there's nothing
         nextWord = self.eatWord()
-        if nextWord != "of": self.restoreState(); return "LOCAL"
+        if nextWord != "of": self.restoreState(); return LabelLocation(local=True)
         nextWord = self.eatWord()
         if nextWord == "this":
             nextWord = self.eatWord()
-            if nextWord == "Act": self.discardState(); return "LOCAL"
-            else: showError("Unknown \"of\" type: this " + nextWord, location = self.decoratedText); self.restoreState(); return None
+            if nextWord == "Act": self.discardState(); return LabelLocation(local=True)
+            else: showError("Unknown \"of\" type: this " + nextWord, location = self.decoratedText); self.restoreState(); return LabelLocation(local=True)
         elif nextWord == "that":
             nextWord = self.eatWord()
-            if nextWord == "Act": self.discardState(); return "that Act"
-            else: showError("Unknown \"of\" type: that " + nextWord, location = self.decoratedText); self.restoreState(); return None
+            if nextWord == "Act": self.discardState(); return LabelLocation(actName="that Act")
+            else: showError("Unknown \"of\" type: that " + nextWord, location = self.decoratedText); self.restoreState(); return LabelLocation(local=True)
         elif nextWord != "the":
             showError("Unknown \"of\" type: " + nextWord, location = self.decoratedText)
+            self.restoreState(); return LabelLocation(local=True)
             pass
         #At this point, we have found the text "of the"
-        actWords = []
         nextWord = self.eatWord()
-        #special cases for references to the "Act" or the "Regulations"
-        if nextWord == "Act": return "Act"
-        elif nextWord == "Regulations": return "Regulations"
-        while nextWord is not None:
-            actWords.append(nextWord)
-            if nextWord == "Act": self.discardState(); return " ".join(actWords)
-            nextWord = self.eatWord()
+        #handle the case of definition reference
+        if nextWord == "definition":
+            lloc = self.eatDefinitionAndSection()  #if we find a def & section, return the LabelLocation, otherwise parse it in off chance that it's an act name or seomething
+            if lloc is not None: self.discardState(); return lloc
             pass
 
+        actWords = []
+        #special cases for references to the "Act" or the "Regulations"
+        if nextWord == "Act": return LabelLocation(actName="Act")
+        elif nextWord == "Regulations": return LabelLocation(actName="Regulations")
+        while nextWord is not None:
+            actWords.append(nextWord)
+            if nextWord == "Act": self.discardState(); return LabelLocation(actName=" ".join(actWords))
+            nextWord = self.eatWord()
+            pass
         #TODO: add code to handle "Income Tax Application Rules" (and maybe other names ending in "Rules"?)
 
         showError("Unknown \"of\" type: no closing \"Act\": " + str(actWords), location = self.decoratedText)
         self.restoreState()
-        return "LOCAL"
+        return LabelLocation(local=True)
     def eatLabelSeries(self):
         """This is one of the key methods of the parser.  Eats a series of labels (e.g., "section 4, 2 and 7 [of the Fiseries Act]") and returns a tuple (location, list of fragments).  The location is "LOCAL" if the location is the local statute. The returns values are both None if there is no match.
         @rtype: str, list of Fragment
@@ -238,21 +318,7 @@ class TextParse(object):
             pass
         location = self.eatActLocation()
         return location, labelList
-    def eatMultipleLabelSeries(self):
-        """Eats a series of label series (e.g., "sections 4, and 7 and paragraph 3(b)) and returns a dictionary index by location and containing corresponding lists of labels.
-        @rtype: dict of Fragment
-        """
-        seriesDict = {}
-        loc, labList = self.eatLabelSeries()
-        if labList is None: return None
-        while labList is not None:
-            if loc not in seriesDict: seriesDict[loc] = []
-            seriesDict[loc] += labList
-            con = self.eatConnector()
-            if con is None: break
-            loc, labList = self.eatLabelSeries()
-            pass
-        return seriesDict
+
     def eatNextLabelSeries(self):
         """Eats to the start of a labelSeries, and then eats and returns the series.  If no valid label series found, advances point to end of string and returns None, None."""
         namem = sectionNamePat.search(self.ltext, self.ptr) #find the first start of a label series
@@ -267,10 +333,6 @@ class TextParse(object):
         self.ptr = len(self.text)
         return None, None
 
-    def addDecorators(self):
-        """Adds required decorators to the underlying DecoratedText object."""
-        return
-
 class ApplicationParse(TextParse):
     #TODO - handle references to non-current Segments
     #TODO - code to add decorators
@@ -283,6 +345,7 @@ class ApplicationParse(TextParse):
         TextParse.__init__(self,decoratedText)
         self.thisList = [] #list of areas that are referred to as "this", such as "this section" or "this part"
         self.sectionDict = {}
+        self.definitionRefList = [] #contains a list of tuples (definition location, list of labels)
         self.eatStart()
         #repeatedly eat labelSeries and this's, with connectors in between, until we have no more matches
         self.eatApplicationRange()
@@ -307,8 +370,17 @@ class ApplicationParse(TextParse):
         while True:
             loc, labelList = self.eatLabelSeries()
             if labelList is not None:
-                if loc not in self.sectionDict: self.sectionDict[loc] = []
-                self.sectionDict[loc] += labelList
+                if loc.isLocal():
+                    if "LOCAL" not in self.sectionDict: self.sectionDict["LOCAL"] = []
+                    self.sectionDict["LOCAL"] += labelList
+                elif loc.isActRef():
+                    ls = loc.getActName()
+                    if ls not in self.sectionDict: self.sectionDict[ls] = []
+                    self.sectionDict[ls] += labelList
+                    pass
+                elif loc.isDefinitionRef():
+                    self.definitionRefList.append((loc,labelList))
+                else: raise LangUtilException("eatApplicationRange -- should not get here in code.")
             else: #look for a this block
                 thisFrag = self.eatThis()
                 if thisFrag is None: showError("Could not find label list or this in expected spot in application language.",location=self.decoratedText); break
@@ -322,6 +394,8 @@ class ApplicationParse(TextParse):
             print(locstr + " : " + ", ".join(c.getText() for c in self.sectionDict[loc]))
             pass
         print(",".join(str(c) for c in self.thisList))
+        for loc, labList in self.definitionRefList: print(str(loc) + " : " + str([str(c) for c in labList]))
+
         return
     def getSectionLabelCollection(self):
         """Returns the SectionLabelCollection object representing the applicability range described in the text."""
@@ -379,15 +453,25 @@ class SectionReferenceParse(TextParse):
         """
         TextParse.__init__(self,decoratedText)
         self.sectionDict = {} #list of fragments for internal references
+        self.definitionRefList = []
         self.eatAllSectionReferences()
-
         return
     def eatAllSectionReferences(self):
         """Eat all the label series in the text, and store in sectionDict dictionary."""
         loc, labList = self.eatNextLabelSeries()
         while loc is not None:
-            if loc not in self.sectionDict: self.sectionDict[loc] = []
-            self.sectionDict[loc] += labList
+            if loc.isLocal():
+                if "LOCAL" not in self.sectionDict: self.sectionDict["LOCAL"] = []
+                self.sectionDict["LOCAL"] += labList
+                pass
+            elif loc.isActRef():
+                ls = loc.getActName()
+                if ls not in self.sectionDict: self.sectionDict[ls] = []
+                self.sectionDict[ls] += labList
+                pass
+            elif loc.isDefinitionRef():
+                self.definitionRefList.append((loc,labList))
+                pass
             loc, labList = self.eatNextLabelSeries()
             pass
         return
@@ -398,8 +482,9 @@ class SectionReferenceParse(TextParse):
         statData = self.decoratedText.getStatute().getStatuteData()
         if "LOCAL" in self.sectionDict:
             statData.pinpointFragmentList(fragmentList=self.sectionDict["LOCAL"],locationSL=self.decoratedText.getSectionLabel())
-            #TODO - actually create decorators instead printing results
-            for frag in self.sectionDict["LOCAL"]: print(frag.getText() + "--" + (str(frag.getPinpoint()) if frag.hasPinpoint() else "NONE" ))
+            for frag in self.sectionDict["LOCAL"]:
+                if frag.hasPinpoint(): self.addLinkDecorator(frag)
+#            for frag in self.sectionDict["LOCAL"]: print(frag.getText() + "--" + (str(frag.getPinpoint()) if frag.hasPinpoint() else "NONE" ))
             pass
         return
     def showParseData(self):
@@ -407,6 +492,7 @@ class SectionReferenceParse(TextParse):
             locstr = loc
             if len(self.sectionDict[loc]) > 0: print(locstr + " : " + ", ".join(c.getText() for c in self.sectionDict[loc]))
             pass
+        for loc, labList in self.definitionRefList: print(str(loc) + " : " + str([str(c) for c in labList]))
         return
 
 
@@ -415,13 +501,13 @@ if __name__ == "__main__":
     import DecoratedText
     import Statute
 
-    #Test 1
+    print("\nTEST 1")
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="12.3(14)(a)")
     t = TextParse(s)
     lab = t.eatLabel()
     if lab.getText() != s.getText(): print "Error 1: [" + s.getText() + "] [" + str(lab) + "]"
 
-    #Test 2
+    print("\nTEST 2")
     s =DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="Subsection 4.1")
     t = TextParse(s)
     labt = t.eatLabelType()
@@ -429,13 +515,15 @@ if __name__ == "__main__":
     if labt != "subsection": print "Error 2: [" + s.getText() + "] [" + str(labt) + "]"
     if lab.getText() != "4.1": print "Error 3: [" + s.getText() + "] [" + str(lab) + "]"
 
-    #Test 3
+    print("\nTest 3")
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01), this Part and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1) and subsections 40 and 50 of the Fisheries Act and subsections 60(1), (2) and (3) of the Act and paragraphs 1(1)(a) and (b) of this Act.")
+    #print(s.getText())
     t = ApplicationParse(s)
     t.showParseData()
 
-    #test 4
-    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01), this Part and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1) and subsections 40 and 50 of the Fisheries Act and subsections 60(1), (2) and (3) of the Act and paragraphs 1(1)(a) and (b) of this Act.")
+    print("\nTest 4")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in subsection 47(3), paragraphs 53(1)(j) and 110(1)(d) and (d.01), this Part and subsections 110(1.1), (1.2), (1.5), (1.6) and (2.1) and subsections 40 and 50 of the Fisheries Act and subsections 60(1), (2) and (3) of the Act and paragraphs 1(1)(a) and (b) of this Act and clauses (x), (y) and (z) of the definition \"arbitrary defined term\" in section 42.")
+    #print(s.getText())
     t = SectionReferenceParse(s)
     t.showParseData()
 

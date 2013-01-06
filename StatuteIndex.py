@@ -36,6 +36,7 @@ class StatuteIndex(object):
     """Class for representing list of all the statutes we are handling."""
     def __init__(self):
         self.statuteDataDict = {}
+        self.statuteList = []
         self.loadConfig() #populate self.statuteDataDict with objects for the statutes of interest
         return
     def loadConfig(self):
@@ -53,6 +54,7 @@ class StatuteIndex(object):
                 if value in self.statuteDataDict: raise StatuteIndexException("Error in " + Constants.STATUTECONFIGFILE +", duplicate definition of name [line:" + str(lineno) + "][" + line + "]")
                 curStat = StatuteData(index=self,name=value)
                 self.statuteDataDict[value] = curStat
+                self.statuteList.append(curStat.getName())
                 pass
             elif curStat is None: raise StatuteIndexException("Error in " + Constants.STATUTECONFIGFILE +", value specified before any name [line:" + str(lineno) + "][" + line + "]")
             elif tag == "url": curStat.setUrl(value)
@@ -70,6 +72,8 @@ class StatuteIndex(object):
         if name in self.statuteDataDict: raise StatuteIndexException("Duplicated StatuteData name: " + name)
         self.statuteDataDict[name] = statuteData
         return
+    def getStatuteList(self):
+        return [c for c in self.statuteList]
     def getStatuteData(self,name):
         """Returns the StatuteData object for the named statute.
         @type name: str
@@ -189,12 +193,14 @@ class StatuteData(object):
         if (bundle is None) or forceFetch: #nothing so far, so definitely need to read from url (or being forced to)
             showError("No file, fetching from url ["+self.name+"].",header="LOADING")
             bundle = StatuteFetch.fetchStatute(self.getUrl())
+            showError("Statute loaded from url.", header="LOADING")
             readNew = True
             pass
         elif not self.noCheck: #we have the bundle locally, only check url if updateCheck is set
             showError("File present, checking for update ["+self.name+"].",header="LOADING")
             newData = StatuteFetch.readStatutePage(self.getUrl())
             if StatuteFetch.isStatDictUpdated(bundle,newData): showError("Update found, loading from url ["+self.name+"].",header="LOADING"); bundle = StatuteFetch.fetchStatute(self.getUrl()); readNew = True
+            else: showError("No update found.", header="LOADING")
             pass
         else: pass
         if readNew: #if we have read a new statute from url, output a copy of bundle to back directory
