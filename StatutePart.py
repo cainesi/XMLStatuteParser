@@ -18,7 +18,9 @@ class StatutePart(object):
         if hasattr(self.parent,"getSectionLabel"): return self.parent.getLocationString()
         return "No Location"
     def getSectionLabel(self):
-        """Returns the sL for this part of the Statute, but tracing up the train of parents until a parent. Overridden in subclasses"""
+        """Returns the sL for this part of the Statute, but tracing up the train of parents until a parent. Overridden in subclasses
+        @rtype: SectionLabelLib.SectionLabel
+        """
         if hasattr(self.parent, "getSectionLabel"): return self.parent.getSectionLabel()
         else: return None
     def getStatute(self):

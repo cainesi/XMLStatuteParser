@@ -255,27 +255,27 @@ class StatuteData(object):
         if self.sectionNameDict is None: showError("[" + self.name + "] No sectionNameDict, setting to {}"); self.sectionNameDict = {}
         if self.linksDict is None: showError("[" + self.name + "] No linksDict, setting to {}"); self.linksDict = {}
         return
-    def getSLFromString(self,sLString,locationSL=None):
+    def getSLFromString(self,sLString,locationSL=None,errorLocation=None):
         """Returns the SL (if any) represented by the string in the Statute.  If locationSL is specified, and the sLString is not found in the label dictionary, then additional searches are made pre-pending portions of locationSL.
         @rtype: SectionLabelLib.SectionLabel
         """
-        if self.sectionNameDict is None: showError("Call to getSLFromString before self.sectionNameDict is set. Loading indices."); self.loadIndices()
+        if self.sectionNameDict is None: showError("Call to getSLFromString before self.sectionNameDict is set. Loading indices.",location=errorLocation); self.loadIndices()
         if sLString in self.sectionNameDict: return self.sectionNameDict[sLString]
-        if locationSL is None: showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "]"); return None
+        if locationSL is None: showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "]",location=errorLocation); return None
 
         for subLabel in locationSL.getSubLabels():
             #print(">>" + subLabel.getIDString() + sLString)
             if (subLabel.getIDString() + sLString) in self.sectionNameDict: return self.sectionNameDict[subLabel.getIDString() + sLString]
             pass
-        showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "] [hint:"+locationSL.getIDString()+"]")
+        showError("Could not locate sectionlabel string ["+sLString+"] in statute ["+ self.name + "] [hint:"+locationSL.getIDString()+"]",location=errorLocation)
         return None
-    def getPinpointFromString(self, sLString, locationSL):
+    def getPinpointFromString(self, sLString, locationSL,errorLocation=None):
         """Returns a Pinpoint object for the given sectionLabel string in this statute.  Returns None, None, None if nothing found.
         @type sLString: str
         @type locationSL: SectionLabelLib.SectionLabel
         @rtype: SectionLabelLib.Pinpoint
         """
-        sL = self.getSLFromString(sLString=sLString, locationSL=locationSL)
+        sL = self.getSLFromString(sLString=sLString, locationSL=locationSL,errorLocation=errorLocation)
         if sL is None: return None
         return SectionLabelLib.Pinpoint(statuteName=self.name, sL=sL, page=self.getPageName(sL),anchor=self.getAnchor(sL))
     def getPageName(self,sL):
@@ -290,7 +290,7 @@ class StatuteData(object):
         @type: str
         """
         return sL[1:].getIDString()
-    def pinpointFragmentList(self, fragmentList, locationSL):
+    def pinpointFragmentList(self, fragmentList, locationSL,errorLocation=None):
         """
         Takes a list of fragments, determines their sectionlabels, and marks them with pinpoints in place.
         @type fragmentList: list of langutil.Fragment
@@ -299,7 +299,7 @@ class StatuteData(object):
         """
         curSL = locationSL
         for frag in fragmentList:
-            pinpoint = self.getPinpointFromString(sLString=frag.getText(),locationSL = curSL)
+            pinpoint = self.getPinpointFromString(sLString=frag.getText(),locationSL = curSL,errorLocation=errorLocation)
             if pinpoint is not None:
                 curSL = pinpoint.getSL()
                 frag.setPinpoint(pinpoint)

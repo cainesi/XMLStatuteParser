@@ -157,7 +157,6 @@ class Statute(object):
     def getStatuteData(self):
         """@rtype: StatuteIndex.StatuteData"""
         return self.statuteData
-
     def getSectionData(self):
         """
         Returns SectionData object for statute, containing list of section labels and their ordering.

@@ -342,7 +342,7 @@ class SectionData(object):
             return 0
         return 1
 
-    def getSectionItemFromString(self,sLString,locationItem=None,locationSL=None):
+    def getSectionItemFromString(self,sLString,locationItem=None,locationSL=None,errorLocation=None):
         """Returns the sectionItem references by the given string.  If location is provided, it will also try to match sectionLabel strings by combining stems from the location label's string with the specified string.  Returns None (and shows an error) if no matches can be found.
         @type sLString: unicode
         @type locationSL: SectionLabel
@@ -351,24 +351,24 @@ class SectionData(object):
         """
         if sLString in self.stringToSectionItem: return self.stringToSectionItem[sLString]
         if locationSL is None:
-            if locationItem is None: showError("Could not locate sectionlabel string ["+sLString+"]"); return None
+            if locationItem is None: showError("Could not locate sectionlabel string ["+sLString+"]",location=errorLocation); return None
             locationSL = locationItem.getSectionLabel()
             pass
         for subLabel in locationSL.getSubLabels():
             #print(">>" + subLabel.getIDString() + sLString)
             if (subLabel.getIDString() + sLString) in self.stringToSectionItem: return self.stringToSectionItem[subLabel.getIDString() + sLString]
             pass
-        showError("Could not find item for ["+sLString+"][hint:"+locationSL.getIDString()+"]")
+        showError("Could not find item for ["+sLString+"][hint:"+locationSL.getIDString()+"]",location=errorLocation)
         return None
 
-    def getSLFromString(self,sLString,locationItem=None, locationSL=None):
+    def getSLFromString(self,sLString,locationItem=None, locationSL=None,errorLocation=None):
         """Returns the SL referenced by teh given string in this Statute, or None if there is None.
         @type sLString: unicode
         @type locationSL: SectionLabel
         @type locationItem: StatuteItem.SectionItem
         @rtype: SectionLabel
         """
-        tmp = self.getSectionItemFromString(sLString,locationItem,locationSL)
+        tmp = self.getSectionItemFromString(sLString,locationItem,locationSL,errorLocation=errorLocation)
         if tmp is None: return tmp
         return tmp.getSectionLabel()
 
@@ -413,8 +413,7 @@ class SectionLabelInterval(object):
         return False
     def expandAround(self,sL):
         """Returns a new SectionLabelInterval which includes the range of this interval and the specified sL."""
-
-
+        #TODO: fill this in
 
         return newInterval
 

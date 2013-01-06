@@ -2,6 +2,7 @@
 # X - Rewrite test.py so that it is based on statute names as specified in stat_config.txt
 # X - written, not tested - Code in langutil that relies on Statute's sectionData in order to create applicability object
 # X - Write code to store certain information on statue labels into StatuteData Object - have code to copy in the sectionNameDict
+# reference series conversion should revert to using local label as base at each new label series.
 # Finish code to add decorators for section references
 # Add code to StatuteData object to direct location cites to the correct other statuteData.
 # Add code to stat_config.txt to determine which statutes are parsed or ignored

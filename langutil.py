@@ -18,7 +18,7 @@ class LangUtilException(Exception): pass
 labelPat = re.compile("(" + "(\d+([a-zA-Z])?(\.\d+)?)(\([^\) ]{1,10}\))*" + "|" + "(\([^\) ]{1,10}\))+" + ")")
 connectorPat = re.compile("(?P<connector>to|and( in)?|or|,)")
 sectionNamePat = re.compile("(?P<type>section|subsection|paragraph|clause|subclause)s?")
-wordPat = re.compile(" *(?P<word>[a-zA-Z]+)\s*")
+wordPat = re.compile(" *(?P<word>[-a-zA-Z]+)\s*")
 punctuationPat = re.compile("(?P<punctuation>\.|,)\s*")
 quotePat = re.compile(" *\"(?P<phrase>[^\"]*)\"")
 
@@ -424,9 +424,9 @@ class ApplicationParse(TextParse):
         if "LOCAL" in self.sectionDict: localFragments = self.sectionDict["LOCAL"]
         else: localFragments = []
 
-        #mark the Fragments in our list with the target SL
+        #mark the Fragments in our list with the corresponding target SLs
         for frag in localFragments:
-            tmpLoc = sdata.getSLFromString(frag.getText(), locationSL = curLoc)
+            tmpLoc = sdata.getSLFromString(frag.getText(), locationSL = curLoc, errorLocation=self.decoratedText)
             if tmpLoc is None: showError("Could not find SL for fragment: [" + frag.getText() + "]", location = self.decoratedText)
             else: curLoc = tmpLoc; frag.setTargetSL(curLoc)
         #create intervals for each of the Fragments
@@ -481,7 +481,7 @@ class SectionReferenceParse(TextParse):
         if len(self.sectionDict)  == 0: return
         statData = self.decoratedText.getStatute().getStatuteData()
         if "LOCAL" in self.sectionDict:
-            statData.pinpointFragmentList(fragmentList=self.sectionDict["LOCAL"],locationSL=self.decoratedText.getSectionLabel())
+            statData.pinpointFragmentList(fragmentList=self.sectionDict["LOCAL"],locationSL=self.decoratedText.getSectionLabel(),errorLocation=self.decoratedText)
             for frag in self.sectionDict["LOCAL"]:
                 if frag.hasPinpoint(): self.addLinkDecorator(frag)
 #            for frag in self.sectionDict["LOCAL"]: print(frag.getText() + "--" + (str(frag.getPinpoint()) if frag.hasPinpoint() else "NONE" ))
@@ -527,6 +527,8 @@ if __name__ == "__main__":
     t = SectionReferenceParse(s)
     t.showParseData()
 
-
-def x(r):
-    return 7
+    print("\nTest 5")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="to an official solely for the purposes of section 7.1 of the Federal-Provincial Fiscal Arrangements and Federal Post-Secondary Education and Health Contributions Act;")
+    #print(s.getText())
+    t = SectionReferenceParse(s)
+    t.showParseData()
