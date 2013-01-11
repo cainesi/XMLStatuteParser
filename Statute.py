@@ -88,10 +88,10 @@ class Statute(object):
     def doProcess(self):
         self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
         self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
+        self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
         #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
-        self.markSectionReferences() #detect section references in text, and decorate them
-        self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
+        #self.markSectionReferences() #detect section references in text, and decorate them
         return
 
     ###
@@ -301,11 +301,16 @@ class DefinitionData(object):
 
         #output list of definition headers, for testing purposes
         sLList = itemDict.keys()
-        sLList.sort(cmp=lambda x,y: self.statute.sectionData.cmpSL(x,y))
+        sLList.sort(cmp=lambda x,y: self.statute.sectionData.cmpSL(x,y)) #TODO: replace with key function
         for sL in sLList:
             item = itemDict[sL]
+            print("========")
             print(sL)
             print(item.getInitialTextItem().getText().encode("UTF-8"))
+            dt = itemDict[sL].getInitialTextItem().getDecoratedText()
+            ap = langutil.ApplicationParse(dt)
+            ap.showParseData()
+            pass
         return
     pass
 

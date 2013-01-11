@@ -9,6 +9,7 @@ __author__ = 'caines'
 
 #Could include code here to automate downloading & archiving of statutes from justice.
 
+#TODO: rename this StatuteMetaData, and include the DefinitionData object?
 
 import pickle, shutil, re, os, datetime
 import Constants, StatuteFetch, Statute, SectionLabelLib
@@ -295,10 +296,11 @@ class StatuteData(object):
         Takes a list of fragments, determines their sectionlabels, and marks them with pinpoints in place.
         @type fragmentList: list of langutil.Fragment
         @type locationSL: SectionLabelLib.SectionLabel
-        @return:
         """
+        originalSL = locationSL
         curSL = locationSL
         for frag in fragmentList:
+            if frag.isSeriesStart(): curSL = originalSL #if this is the start of a new series, we should rest the location hint
             pinpoint = self.getPinpointFromString(sLString=frag.getText(),locationSL = curSL,errorLocation=errorLocation)
             if pinpoint is not None:
                 curSL = pinpoint.getSL()

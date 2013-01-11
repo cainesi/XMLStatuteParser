@@ -24,7 +24,7 @@ quotePat = re.compile(" *\"(?P<phrase>[^\"]*)\"")
 
 class Fragment(object):
     """class representing a fragment of text, along with it's position in the parent text block."""
-    def __init__(self,text,position,toConnected=False):
+    def __init__(self,text,position,toConnected=False,seriesStart=False):
         """Fragment represents a fragment from a larger string.
         text is the extract represented,
         position is the index at which it appears in larger string,
@@ -32,7 +32,8 @@ class Fragment(object):
         """
         self.text = text
         self.position = position
-        self.toConnected = toConnected
+        self.toConnected = toConnected #is True if this Fragment is connection to prior Fragment by a "to" (important to know when calculating applicability ranges)
+        self.seriesStart = seriesStart #is True if this is the first Fragment in a series of labels (important to know when determining which section is referred to.
         self.targetSL = None
         self.pinpoint = None
         return
@@ -40,7 +41,8 @@ class Fragment(object):
     def getPosition(self): return self.position
     def getStart(self): return self.getPosition() #return start of string in main text
     def getEnd(self): return self.getPosition() + len(self) #return end of string in main text
-    def setToConnected(self,toConnected): self.toConnected = toConnected; return
+    def setToConnected(self,toConnected=True): self.toConnected = toConnected; return
+    def setSeriesStart(self,seriesStart=True): self.seriesStart = seriesStart; return
     def setPinpoint(self, pinpoint):
         """
         @type pinpoint: SectionLabelLib.Pinpoint
@@ -68,8 +70,13 @@ class Fragment(object):
         if self.targetSL is None: return False
         return True
     def isToConnected(self): return self.toConnected #indicates whether fragment is linked to prior one by a "to"
+    def isSeriesStart(self):
+        """@rtype: bool"""
+        return self.seriesStart
     def __len__(self): return len(self.text)
-    def __str__(self): return self.getText()
+    def __str__(self):
+        if self.isToConnected(): return self.getText() + "<+t>"
+        return self.getText()
 
 class LabelLocation(object):
     """Class for encapsulating information about where a label points to (locally within the current act, another act, regulations, within a definition."""
@@ -122,6 +129,8 @@ class TextParse(object):
         self.ptrStack = []
         self.eatSpace() #there should never be leading space on the text
         return
+    def __len__(self):
+        return len(self.text)
 
     def saveState(self):
         """Save the state of the pointer, so we can restore to this point if desired."""
@@ -142,7 +151,6 @@ class TextParse(object):
         return
     def getMatches(self, matchType):
         return self.matches[matchType]
-
     ###
     #
     # Methods to manipulate underlying DecoratedText
@@ -158,19 +166,30 @@ class TextParse(object):
     # Functions to parse/eat parts of text
     #
     ###
-
+    def atEnd(self):
+        """Returns True if ptr is at end of string.
+        @rtype: bool
+        """
+        if self.ptr == len(self.text): return True
+        return False
     def eatSpace(self):
-        """Advance pointer to the first non-space."""
+        """Advance pointer to the first non-space.
+        @rtype: None
+        """
         while self.ptr < len(self.text) and self.text[self.ptr].isspace(): self.ptr += 1
         return
     def eatWord(self):
-        """Eats and returns one word, and advances pointer to end of space following word."""
+        """Eats and returns one word, and advances pointer to end of space following word.
+        @rtype: str
+        """
         m = wordPat.match(self.text,self.ptr)
         if m is None: return None
         self.ptr = m.end()
         return m.group("word")
     def eatPunctation(self):
-        """Eats a punction mark (one of "." and ",") and returns it, or None if no punctation at current position."""
+        """Eats a punction mark (one of "." and ",") and returns it, or None if no punctuation at current position.
+        @rtype: str
+        """
         m = punctuationPat.match(self.text,self.ptr)
         if m is None: return None
         self.ptr = m.end()
@@ -197,9 +216,13 @@ class TextParse(object):
         self.eatSpace()
         return
     def eatConnector(self):
-        con = connectorPat.match(self.ltext[self.ptr:])
+        """Eats and returns a connector (connector may not be at end of string).
+        @rtype: str
+        """
+        con = connectorPat.match(self.ltext, self.ptr)
         if con is None: return None
-        self.ptr += con.end()
+        if con.end() == len(self): return None
+        self.ptr = con.end()
         self.eatSpace()
         return con.group("connector")
     def eatLabelType(self):
@@ -296,7 +319,9 @@ class TextParse(object):
             if nextWord == "Act": self.discardState(); return LabelLocation(actName=" ".join(actWords))
             nextWord = self.eatWord()
             pass
+
         #TODO: add code to handle "Income Tax Application Rules" (and maybe other names ending in "Rules"?)
+        #TODO: add code to handle references to "Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952"
 
         showError("Unknown \"of\" type: no closing \"Act\": " + str(actWords), location = self.decoratedText)
         self.restoreState()
@@ -317,6 +342,7 @@ class TextParse(object):
             frag = self.eatConnectorAndLabel()
             pass
         location = self.eatActLocation()
+        if len(labelList) > 0: labelList[0].setSeriesStart()
         return location, labelList
 
     def eatNextLabelSeries(self):
@@ -336,10 +362,9 @@ class TextParse(object):
 class ApplicationParse(TextParse):
     #TODO - handle references to non-current Segments
     #TODO - code to add decorators
-    #TODO - code to create applicability range objects
     #TODO - code to find single-definition subsections
     """Parser that automatically eats the text to determine the applicability range."""
-    initialPat = re.compile("^in|apply in|^for the purposes of|apply for the purposes of")
+    initialPat = re.compile("^in|apply in|for the purposes of")
     thisPat = re.compile("this (?P<thisType>[a-z]+)")
     def __init__(self, decoratedText):
         TextParse.__init__(self,decoratedText)
@@ -389,31 +414,36 @@ class ApplicationParse(TextParse):
             if con is None: break
         return
     def showParseData(self):
+        print("ApplicationParse Contents: {")
         for loc in self.sectionDict:
             locstr = loc
-            print(locstr + " : " + ", ".join(c.getText() for c in self.sectionDict[loc]))
+            print(locstr + " : " + ", ".join(str(c) for c in self.sectionDict[loc]))
             pass
         print(",".join(str(c) for c in self.thisList))
         for loc, labList in self.definitionRefList: print(str(loc) + " : " + str([str(c) for c in labList]))
-
+        print("}")
         return
     def getSectionLabelCollection(self):
-        """Returns the SectionLabelCollection object representing the applicability range described in the text."""
+        """Returns the SectionLabelCollection object representing the applicability range described in the text.
+        (Because of the need to get information on intervals, this code uses the data in the Statutes SectionData object, rather than the StatuteData object.)
+        @rtype: SectionLabelLib.SectionLabelCollection
+        """
+        #TODO: add more data to the StatuteData object so that it can also do what is required by this method (calculating intervals, etc.).
         intervalList = []
         #add "this" intervals
         sdata = self.decoratedText.getStatute().getSectionData() #SectionData object for the Statute
-        curLoc = self.decoratedText.getSectionLabel() #current sectionLabel
+        originalLoc = self.decoratedText.getSectionLabel() #current sectionLabel
         if len(self.thisList) > 0:
             segData = self.decoratedText.getStatute().getSegmentData()
-            if "act" in self.thisList: return SectionLabelLib.UniversalSectionLabelCollection(sectionData = sdata)
+            if "act" in self.thisList: return SectionLabelLib.UniversalSectionLabelCollection(sectionData = sdata) #if applicability says "this Act" just return the universal range
             for area in self.thisList:
                 if area in ["part","division", "subdivision"]:
-                    curSegment = segData.currentSegment[curLoc] #find the current segment and refine it to the appropriate level
+                    curSegment = segData.currentSegment[originalLoc] #find the current segment and refine it to the appropriate level
                     if area == "part": curSegment = curSegment.getPart()
                     elif area == "division": curSegment = curSegment.getDivision()
                     elif area == "subdivision": curSegment = curSegment.getSubdivision()
-                    if curSegment is None: showError("Could not find current segment [" + area + "] for: " + str(curLoc), location = self.decoratedText)
-                    else:
+                    if curSegment is None: showError("Could not find current segment [" + area + "] for: " + str(originalLoc), location = self.decoratedText)
+                    else: #if we found a segment
                         contents = list(segData.segmentContents[curSegment])
                         intervalList.append(SectionLabelLib.SectionLabelInterval(sectionData=sdata,sLList=contents))
                     pass
@@ -424,8 +454,10 @@ class ApplicationParse(TextParse):
         if "LOCAL" in self.sectionDict: localFragments = self.sectionDict["LOCAL"]
         else: localFragments = []
 
+        curLoc = originalLoc
         #mark the Fragments in our list with the corresponding target SLs
         for frag in localFragments:
+            if frag.isSeriesStart(): curLoc = originalLoc #reset curLoc each time we start a new series
             tmpLoc = sdata.getSLFromString(frag.getText(), locationSL = curLoc, errorLocation=self.decoratedText)
             if tmpLoc is None: showError("Could not find SL for fragment: [" + frag.getText() + "]", location = self.decoratedText)
             else: curLoc = tmpLoc; frag.setTargetSL(curLoc)
@@ -531,4 +563,10 @@ if __name__ == "__main__":
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="to an official solely for the purposes of section 7.1 of the Federal-Provincial Fiscal Arrangements and Federal Post-Secondary Education and Health Contributions Act;")
     #print(s.getText())
     t = SectionReferenceParse(s)
+    t.showParseData()
+
+    print("\nTest 6")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="Subject to subsections (8) and (8.1), for the purposes of this subsection and subsection (3),")
+    #print(s.getText())
+    t = ApplicationParse(s)
     t.showParseData()
