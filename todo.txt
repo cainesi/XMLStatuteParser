@@ -2,7 +2,9 @@
 # X - Rewrite test.py so that it is based on statute names as specified in stat_config.txt
 # X - written, not tested - Code in langutil that relies on Statute's sectionData in order to create applicability object
 # X - Write code to store certain information on statue labels into StatuteData Object - have code to copy in the sectionNameDict
-# reference series conversion should revert to using local label as base at each new label series.
+# X - reference series conversion should revert to using local label as base at each new label series -- appropriate Fragments are now marked as "seriesStart" to accomplish this
+# Avoid parsing application ranges in "read as" provisions.
+# Code to find one-off definitions
 # Finish code to add decorators for section references
 # Add code to StatuteData object to direct location cites to the correct other statuteData.
 # Add code to stat_config.txt to determine which statutes are parsed or ignored
@@ -12,7 +14,8 @@
 # Confirm that page output working correctly
 # Code to allow one Decorator to override overlapping decorators when added (for example, if the existing decorator doesn't have a pinpoint object)
 # have historical notes handled as a subclass of TextItems rather than as a field of SectionItems, or at least represent them as a DecoratedText object so that they can be marked-up with cross refernces to the implementing/amending legislation.
-
+# fix up paragraphs where the defined term isn't detected correctly.
+# move SectionData, DefinitionData, StatuteData, StatuteIndex, etc., into StatuteMetaData module
 
 # Code for tables of contents for each instrument
 # Code to add disclaimer footer on each page

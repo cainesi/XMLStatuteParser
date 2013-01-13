@@ -209,10 +209,10 @@ class DefinitionItem(SectionItem):
         SectionItem.__init__(self,parent, tree)
         self.definedTerms = [] #collect list of all terms defined in this definition section
         for item in self.items:
-            if isinstance(item,TextItem): self.definedTerms += item.getDefinedTerms()
+            if isinstance(item,TextItem): self.definedTerms += [c.lower() for c in item.getDefinedTerms()]
             pass
         #TODO: should somehow reconcile the list of defined terms with the sections's SectionLabel object (in some cases they are inconsistent in the XML.
-        if self.sectionLabel.hasLastEmptyDefinition(): #show an error if we have an do defined term in the sectionLabel (except for repealed provisions, which we don't really care about.
+        if self.sectionLabel.hasLastEmptyDefinition(): #show an error if we have an empty defined term in the sectionLabel (except for repealed provisions, which we don't really care about.
             if "repealed" not in self.getRawText(limit=100).lower(): showError("Empty definition.", location=self)
         return
 
@@ -236,6 +236,14 @@ class DefinitionItem(SectionItem):
         paragraphs =  self.getSubParagraphs(renderContext)
         if len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True #force first paragraph, if any, to start a new paragraph
         return paragraphs
+    def getDefinedTerm(self):
+        """Returns the first defined term in them item.
+        @rtype: str
+        """
+        if len(self.definedTerms) == 0: return None
+        else:
+            if len(self.definedTerms) > 1: showError("Asking for defined terms in a DefinitionItem with multiple defined terms: "+ str(self.definedTerms), location=self)
+            return self.definedTerms[0]
     pass
 
 class FormulaItem(BaseItem):
@@ -336,7 +344,7 @@ class TextItem(BaseItem):
         self.processTree(self.tree)
         self.decoratedText = self.firstPiece.assembleText()
         #self.text, self.decorators = self.firstPiece.assembleText()
-        self.definedTerms = [] #list of defined terms appearing in this text block
+        self.definedTerms = self.decoratedText.getDefinedTerms() #list of defined terms appearing in this text block
         #TODO: extract defined terms from the applicable decorators
 
         return

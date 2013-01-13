@@ -256,9 +256,9 @@ class SegmentData:
         self.segmentList = []
         self.segmentTitle = {} #dictionary indexed by Segment, giving segment's title
         self.containingSegment = {} #dictionary indexed by sectional label, giving the most narrow Segment the section is in
-        self.segmentContents = {} #dictionary providing a set of sections in each segment of the statute
-        self.segmentContents[Segment([])] = set([]) #these two entries are dumping grounds for sections that are not in a Segment at all, or do not have a division / subdivision / etc
-        self.segmentContents[None] = set([])
+        self.segmentContents = {} #dictionary providing a list of sections in each segment of the statute
+        self.segmentContents[Segment([])] = [] #these two entries are dumping grounds for sections that are not in a Segment at all, or do not have a division / subdivision / etc
+        self.segmentContents[None] = []
         return
     def addNewNumbering(self,newNumbering, title=None):
         """Called when a new heading numbering seen in the court of the statute.  This method computes what new segment must be (based on the latest numbering and the numberings of the preceding segment) and updates the segment information accordingly."""
@@ -268,19 +268,19 @@ class SegmentData:
         self.currentPart = self.currentSegment.getPart()
         self.currentDivision = self.currentSegment.getDivision()
         self.currentSubdivision = self.currentSegment.getSubdivision()
-        if self.currentSegment not in self.segmentContents: self.segmentContents[self.currentSegment] = set([])
-        if self.currentPart not in self.segmentContents: self.segmentContents[self.currentPart] = set([])
-        if self.currentDivision not in self.segmentContents: self.segmentContents[self.currentDivision] = set([])
-        if self.currentSubdivision not in self.segmentContents: self.segmentContents[self.currentSubdivision] = set([])
+        if self.currentSegment not in self.segmentContents: self.segmentContents[self.currentSegment] = []
+        if self.currentPart not in self.segmentContents: self.segmentContents[self.currentPart] = []
+        if self.currentDivision not in self.segmentContents: self.segmentContents[self.currentDivision] = []
+        if self.currentSubdivision not in self.segmentContents: self.segmentContents[self.currentSubdivision] = []
         if title is not None: self.segmentTitle[self.currentSegment] = title
         return
     def addSection(self,sectionLabel):
         """Record that the specified sectionLabel exists within the current Segment of the statute (and all enclosing super-Segments)."""
         self.containingSegment[sectionLabel] = self.currentSegment
-        self.segmentContents[self.currentPart].add(sectionLabel)
-        self.segmentContents[self.currentDivision].add(sectionLabel)
-        self.segmentContents[self.currentSubdivision].add(sectionLabel)
-        self.segmentContents[self.currentSegment].add(sectionLabel)
+        self.segmentContents[self.currentPart].append(sectionLabel)
+        self.segmentContents[self.currentDivision].append(sectionLabel)
+        self.segmentContents[self.currentSubdivision].append(sectionLabel)
+        self.segmentContents[self.currentSegment].append(sectionLabel)
         return
     def setSegmentTitle(self,segment,title):
         self.segmentTitle[segment] = title
@@ -320,6 +320,13 @@ class SectionData(object):
                 else: self.stringToSectionItem[sLString] = section
             n += 1
             pass
+        return
+
+    def getSLPosition(self,sL):
+        """@type sL: SectionLabel
+        @rtype: int
+        """
+        self.sectionStart(sL)
         return
 
     def ltSL(self, sL1, sL2):
@@ -411,11 +418,6 @@ class SectionLabelInterval(object):
         n = self.sectionData[sL]
         if n >= self.start and n < self.end: return True
         return False
-    def expandAround(self,sL):
-        """Returns a new SectionLabelInterval which includes the range of this interval and the specified sL."""
-        #TODO: fill this in
-
-        return newInterval
 
     def __len__(self):
         return self.start - self.end
@@ -440,7 +442,7 @@ class SectionLabelCollection(object):
             if sL in interval: return True
         return False
     def __str__(self):
-        return "<SectionCollection:" + "\n\t".join(str(c) for c in self.intervals) + ">"
+        return "<SectionCollection:" + ";\t".join(str(c) for c in self.intervals) + ">"
     def __len__(self): return sum(len(c) for c in self.intervals)
     def __contains__(self,sL): return self.containsSL(sL)
 

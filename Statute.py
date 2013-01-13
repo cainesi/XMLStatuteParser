@@ -6,6 +6,7 @@ import Constants, SectionLabelLib
 import XMLStatParse
 import StatuteItem, langutil
 import RenderContext
+from ErrorReporter import showError
 
 #workflow for parsing statute:
 # 1) parse xml into tree structure
@@ -89,6 +90,7 @@ class Statute(object):
         self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
         self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
         self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
+        self.definitionData.displayDefinedTerms()
         #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
         #self.markSectionReferences() #detect section references in text, and decorate them
@@ -288,31 +290,63 @@ class DefinitionData(object):
         @type statute: Statute
         """
         self.statute = statute
+        self.definedTermRanges = {} #dictionary indexed by defined terms, where each entry is a tuple (sourceitem, application range)
+        self.applicationRange = {} #dictionary indexed by sL, and giving the application range specified by that sL.
         self.scopeDefinedTerms()
+        self.sectionData = self.statute.getSectionData()
         return
 
     def scopeDefinedTerms(self):
         """Determines the scope for defined terms appearing in the Statute."""
-        itemDict = {} # a dictionary of sections that are parents of definitions, indexed by sectionlabel
+        itemDict = {} # a dictionary of StatuteItems that are parents of definitions, indexed by sectionlabel
         for item in self.statute.itemIterator():
-            parent = item.parent
-            if isinstance(item,StatuteItem.DefinitionItem): itemDict[parent.getSectionLabel()] = parent
+            if isinstance(item,StatuteItem.DefinitionItem):
+                parent = item.parent
+                parentSL = parent.getSectionLabel()
+                if parentSL in self.applicationRange: appRange = self.applicationRange[parentSL]
+                else: # if we haven't already processed that item, do so now
+                    decoratedText = parent.getInitialTextItem().getDecoratedText()
+                    appParse = langutil.ApplicationParse(decoratedText=decoratedText)
+                    appRange = appParse.getSectionLabelCollection()
+                    self.applicationRange[parentSL] = appRange
+                    pass
+                definedTerm = item.getDefinedTerm()
+                if definedTerm is None: showError("No defined term found in: " + str(item.getSectionLabel()), location = item)
+                else:
+                    definedTerm = definedTerm.lower()
+                    if definedTerm not in self.definedTermRanges: self.definedTermRanges[definedTerm] = []
+                    self.definedTermRanges[definedTerm].append((item,appRange))
+                    itemDict[parent.getSectionLabel()] = parent
+                    pass
+                pass
             pass
 
         #output list of definition headers, for testing purposes
-        sLList = itemDict.keys()
-        sLList.sort(cmp=lambda x,y: self.statute.sectionData.cmpSL(x,y)) #TODO: replace with key function
-        for sL in sLList:
-            item = itemDict[sL]
-            print("========")
-            print(sL)
-            print(item.getInitialTextItem().getText().encode("UTF-8"))
-            dt = itemDict[sL].getInitialTextItem().getDecoratedText()
-            ap = langutil.ApplicationParse(dt)
-            ap.showParseData()
+#        sLList = itemDict.keys()
+#        sLList.sort(key=self.sectionData.getSLPosition) #TODO: replace with key function
+#        for sL in sLList:
+#            item = itemDict[sL]
+#            print("========")
+#            print(sL)
+#            print(item.getInitialTextItem().getText().encode("UTF-8"))
+#            dt = itemDict[sL].getInitialTextItem().getDecoratedText()
+#            ap = langutil.ApplicationParse(dt)
+#            ap.showParseData()
+#            pass
+        return
+    def displayDefinedTerms(self):
+        """Prints out a listing of the defined terms."""
+        terms = self.definedTermRanges.keys()
+        terms.sort()
+        for term in terms:
+            print(">> " + term + " <<")
+            for item,appRange in self.definedTermRanges[term]: print(" - " + str(appRange))
             pass
         return
+
     pass
+
+
 
 def processAct(url):
     """Method to grab the statute found at a specific url and automatically process it into wiki pages.  Ultimately it should automatically include any regulations"""

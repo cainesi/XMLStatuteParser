@@ -49,7 +49,15 @@ class DecoratedText(StatutePart):
             pass
         textList.append(self.text[ptr:])
         return u"".join(textList)
-
+    def getDefinedTerms(self):
+        """Returns a list of defined terms in the DecoratedText.
+        @rtype: list of str
+        """
+        terms = []
+        for dec in self.decorators:
+            if isinstance(dec,DefinedTermDecorator): terms.append(dec.getDefinedTerm())
+            pass
+        return terms
 
 
 class Decorator(StatutePart):

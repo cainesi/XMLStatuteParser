@@ -322,7 +322,8 @@ class TextParse(object):
 
         #TODO: add code to handle "Income Tax Application Rules" (and maybe other names ending in "Rules"?)
         #TODO: add code to handle references to "Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952"
-
+        #TODO: references of the "paragraphs (f) and (h) of the description of B in that definition"
+        #TODO: paragraphs (a) to (d), (f) and (g) of the definition "qualified investment" in section 204
         showError("Unknown \"of\" type: no closing \"Act\": " + str(actWords), location = self.decoratedText)
         self.restoreState()
         return LabelLocation(local=True)
@@ -433,18 +434,21 @@ class ApplicationParse(TextParse):
         #add "this" intervals
         sdata = self.decoratedText.getStatute().getSectionData() #SectionData object for the Statute
         originalLoc = self.decoratedText.getSectionLabel() #current sectionLabel
-        if len(self.thisList) > 0:
+        thisStrList = [c.getText() for c in self.thisList] #self.thisList is filled with Fragments
+        if len(thisStrList) > 0:
             segData = self.decoratedText.getStatute().getSegmentData()
-            if "act" in self.thisList: return SectionLabelLib.UniversalSectionLabelCollection(sectionData = sdata) #if applicability says "this Act" just return the universal range
-            for area in self.thisList:
+            if "act" in thisStrList: return SectionLabelLib.UniversalSectionLabelCollection(sectionData = sdata) #if applicability says "this Act" just return the universal range
+            for area in thisStrList:
                 if area in ["part","division", "subdivision"]:
-                    curSegment = segData.currentSegment[originalLoc] #find the current segment and refine it to the appropriate level
+                    if originalLoc not in segData.containingSegment:
+                        showError("Could not find segment for SL: " + str(originalLoc), location = self.decoratedText); break
+                    curSegment = segData.containingSegment[originalLoc] #find the current segment and refine it to the appropriate level
                     if area == "part": curSegment = curSegment.getPart()
                     elif area == "division": curSegment = curSegment.getDivision()
                     elif area == "subdivision": curSegment = curSegment.getSubdivision()
                     if curSegment is None: showError("Could not find current segment [" + area + "] for: " + str(originalLoc), location = self.decoratedText)
                     else: #if we found a segment
-                        contents = list(segData.segmentContents[curSegment])
+                        contents = segData.segmentContents[curSegment]
                         intervalList.append(SectionLabelLib.SectionLabelInterval(sectionData=sdata,sLList=contents))
                     pass
                 else: showError("Unknown segment type: " + area, location=self.decoratedText)

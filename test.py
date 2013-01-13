@@ -11,7 +11,7 @@ si = StatuteIndex.StatuteIndex()
 
 
 for statName in statList: #parse each file in turn
-    s = "== " + statName + " =="
+    s = "== Parsing: " + statName + " =="
     print("=" * len(s))
     #print("==" + (" " * (len(s)-4)))
     print("== " + statName + " ==")

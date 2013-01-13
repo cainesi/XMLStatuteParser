@@ -23,6 +23,9 @@ class StatutePart(object):
         """
         if hasattr(self.parent, "getSectionLabel"): return self.parent.getSectionLabel()
         else: return None
+    def getParent(self):
+        """Returns the parent object for this item."""
+        return self.parent
     def getStatute(self):
         """
         @rtype: Statute.Statute
