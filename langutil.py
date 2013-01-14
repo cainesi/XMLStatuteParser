@@ -451,9 +451,8 @@ class ApplicationParse(TextParse):
                     else: showError("Could not find this \"" + area + "\"", location=self.decoratedText)
                     pass
                 elif area in ["part","division", "subdivision"]:
-                    if localLoc not in segData.containingSegment:
-                        showError("Could not find segment for SL: " + str(localLoc), location = self.decoratedText, color=True); break
-                    curSegment = segData.containingSegment[localLoc] #find the current segment and refine it to the appropriate level
+                    curSegment = segData.getContainingSegment(localLoc) #find the current segment and refine it to the appropriate level
+                    if curSegment is None: showError("Could not find segment for SL: " + str(localLoc), location = self.decoratedText); contiue
                     if area == "part": curSegment = curSegment.getPart()
                     elif area == "division": curSegment = curSegment.getDivision()
                     elif area == "subdivision": curSegment = curSegment.getSubdivision()

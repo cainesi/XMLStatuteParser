@@ -207,7 +207,7 @@ class Segment(object):
 
     def __str__(self): return "(" + " ".join(str(c) for c in self.numberings) + ")"
 
-    def __repr__(self): return "<Segment:"+self.numberings+">"
+    def __repr__(self): return "<Segment:"+str(self.numberings)+">"
 
     def advanceSegment(self,newNumbering):
         """Returns the next Segment following this Segment, that involves the given newNumbering."""
@@ -258,7 +258,7 @@ class Segment(object):
     pass
 
 class SegmentData(object):
-    """Class for storing data regarding divisions, including a dictionary linking sectionlabels to divisions, and a dictionary of division titles.  Allows sections and segment headings to be recorded as they are encountered moving through the Act, and records how the sections are grouped together into Segments (parts, divisions, etc)."""
+    """Class for storing data regarding divisions, including a dictionary linking *top level* SectionLabels to divisions, and a dictionary of division titles.  Allows sections and segment headings to be recorded as they are encountered moving through the Act, and records how the sections are grouped together into Segments (parts, divisions, etc)."""
     def __init__(self, statute):
         self.statute = statute
         self.currentSegment = Segment([]) #the division sections are currently being added to
@@ -298,6 +298,13 @@ class SegmentData(object):
         self.segmentTitle[segment] = title
     def getSegmentTitle(self,segment):
         return self.segmentTitle[segment]
+    def getContainingSegment(self,sL):
+        """Returns the narrowest Segment that includes the (sub)section.
+        @rtype: Segment
+        """
+        topSection = sL[:1]
+        if topSection not in self.containingSegment: return None
+        return self.containingSegment[topSection]
     pass
 
 class SectionData(object):
@@ -338,8 +345,7 @@ class SectionData(object):
         """@type sL: SectionLabel
         @rtype: int
         """
-        self.sectionStart(sL)
-        return
+        return self.sectionStart[sL]
 
     def ltSL(self, sL1, sL2):
         """
