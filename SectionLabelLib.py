@@ -11,10 +11,10 @@ class SectionLabelException(Exception): pass
 TEST = True
 DEBUG = False
 
-class SectionLabel:
+class SectionLabel(object):
     """Class encapsulating the label for a specific section of an Act."""
     def __init__(self,labelList=None,numberings=None):
-        """Constructs a SectionLabel object from the list of tuples (sectionType, sectionlabelstring).  The type can be specified either by 2-character tags, as returned by the code param parser, or by the full name of the section type."""
+        """Constructs a SectionLabel object from the list of tuples (sectionType, sectionlabelstring).  The type can be specified either by 2-character tags, as returned by the code param parser, or by the full name of the section type.  Once formed the objects should be immutable, so they can be used as dictionary keys, etc."""
         self.numberings = []
         if labelList != None:
             for tag, labelString in labelList:
@@ -34,7 +34,9 @@ class SectionLabel:
         """Creates a new sectionLabel by adding on the specified sectionLabel."""
         return SectionLabel(numberings=self.getNumberings() + sl.getNumberings())
     def __getitem__(self,n):
-        """Create a SectionLabel which is a slice of the current label."""
+        """Create a SectionLabel which is a slice of the current label.
+        @rtype: SectionLabel
+        """
         if type(n) == slice: return SectionLabel(numberings=self.numberings[n])
         return SectionLabel(numberings=[self.numberings[n]])
     def __len__(self):
@@ -70,7 +72,7 @@ class SectionLabel:
         """Creates a new sectionLabel by appending the specified labelString."""
         newSL = SectionLabel(labelList = [(labelType,labelString)])
         return self + newSL
-    def __str__(self): return self.getIDString()
+    def __str__(self): return self.getIDString() #TODO: this doesn't work if the returned string is unicode that is not ascii
     def __repr__(self):
         return self.getDisplayString()
     def getIDString(self):
@@ -85,6 +87,16 @@ class SectionLabel:
         if len(self.numberings) == 0: return False
         if isinstance(self.numberings[-1],DefinitionNumbering) and self.numberings[-1].labelString == "": return True
         return False
+    def truncateSectionLabel(self,sectionType):
+        """Returns a SectionLabel truncated to end at a Numbering of the specified type -- if no Numbering of the type is found, returns None.
+        @rtype: SectionLabel
+        """
+        n = 0
+        for numbering in self.numberings:
+            n += 1
+            if numbering.getSectionType() == sectionType: return self[:n] #return SectionLabel truncated the appropriate amount.
+            pass
+        return None
     pass
 
 class Numbering(object):
@@ -131,7 +143,7 @@ class FormulaNumbering(Numbering):
 validSegmentTypes = ["part","division","subdivision"]
 segmentTitleString = {"part":"PART","division":"Division","subdivision":"subdivision"}
 
-class SegmentNumbering:
+class SegmentNumbering(object):
     """Class for a single segment level."""
     def __init__(self,segmentType,labelString):
         self.segmentType = segmentType
@@ -152,7 +164,7 @@ class SegmentNumbering:
     def __str__(self): return self.getString()
     pass
 
-class Segment:
+class Segment(object):
     """class for the recording the full segment data for a portion of the act, composed of a list of SegmentNumberings."""
     def __init__(self,segmentNumberingList):
         self.numberings = segmentNumberingList
@@ -245,7 +257,7 @@ class Segment:
         
     pass
 
-class SegmentData:
+class SegmentData(object):
     """Class for storing data regarding divisions, including a dictionary linking sectionlabels to divisions, and a dictionary of division titles.  Allows sections and segment headings to be recorded as they are encountered moving through the Act, and records how the sections are grouped together into Segments (parts, divisions, etc)."""
     def __init__(self, statute):
         self.statute = statute
@@ -399,11 +411,13 @@ class SectionLabelInterval(object):
     """Class representing a contiguous interval of sections."""
     def __init__(self, sectionData, sLList):
         self.sectionData = sectionData
+        self.empty = True
         self.start = -1
         self.end = -1
         if len(sLList) > 0:
             self.start = self.sectionData.sectionStart[sLList[0]]
             self.end = self.sectionData.sectionEnd[sLList[0]]
+            self.empty = False
             for sL in sLList[1:]:
                 if self.sectionData.sectionStart[sL] < self.start: self.start = self.sectionData.sectionStart[sL]
                 if self.sectionData.sectionEnd[sL] > self.end: self.end = self.sectionData.sectionEnd[sL]
@@ -423,7 +437,7 @@ class SectionLabelInterval(object):
         return self.start - self.end
 
     def __str__(self):
-        if self.start == -1: return "<Range: empty>"
+        if self.empty: return "<Range: empty>"
         return "<SectionInterval: "+ str(self.sectionData.numberToSL[self.start]) +" [#"+str(self.start) +"]---"+ str(self.sectionData.numberToSL[self.end-1]) +" [#"+str(self.end) +"]>"
     def __contains__(self,sL): return self.containsSL(sL)
 

@@ -14,7 +14,7 @@ for statName in statList: #parse each file in turn
     s = "== Parsing: " + statName + " =="
     print("=" * len(s))
     #print("==" + (" " * (len(s)-4)))
-    print("== " + statName + " ==")
+    print(s)
     #print("==" + (" " * (len(s)-4)))
     print("=" * len(s))
     st = si.getStatute(name=statName)

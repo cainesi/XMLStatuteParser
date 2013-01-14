@@ -90,7 +90,7 @@ class Statute(object):
         self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
         self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
         self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
-        self.definitionData.displayDefinedTerms()
+        #self.definitionData.displayDefinedTerms()
         #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
         #self.markSectionReferences() #detect section references in text, and decorate them
@@ -340,7 +340,8 @@ class DefinitionData(object):
         terms.sort()
         for term in terms:
             print(">> " + term + " <<")
-            for item,appRange in self.definedTermRanges[term]: print(" - " + str(appRange))
+            for item,appRange in self.definedTermRanges[term]:
+                print(" - " +item.getSectionLabel().getIDString() + " -- " + str(appRange))
             pass
         return
 

@@ -3,6 +3,7 @@
 # X - written, not tested - Code in langutil that relies on Statute's sectionData in order to create applicability object
 # X - Write code to store certain information on statue labels into StatuteData Object - have code to copy in the sectionNameDict
 # X - reference series conversion should revert to using local label as base at each new label series -- appropriate Fragments are now marked as "seriesStart" to accomplish this
+# correct definitions that are not fully captured in SectionLabel.
 # Avoid parsing application ranges in "read as" provisions.
 # Code to find one-off definitions
 # Finish code to add decorators for section references

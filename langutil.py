@@ -433,35 +433,46 @@ class ApplicationParse(TextParse):
         intervalList = []
         #add "this" intervals
         sdata = self.decoratedText.getStatute().getSectionData() #SectionData object for the Statute
-        originalLoc = self.decoratedText.getSectionLabel() #current sectionLabel
+        localLoc = self.decoratedText.getSectionLabel() #current sectionLabel
+
         thisStrList = [c.getText() for c in self.thisList] #self.thisList is filled with Fragments
         if len(thisStrList) > 0:
             segData = self.decoratedText.getStatute().getSegmentData()
             if "act" in thisStrList: return SectionLabelLib.UniversalSectionLabelCollection(sectionData = sdata) #if applicability says "this Act" just return the universal range
             for area in thisStrList:
-                if area in ["part","division", "subdivision"]:
-                    if originalLoc not in segData.containingSegment:
-                        showError("Could not find segment for SL: " + str(originalLoc), location = self.decoratedText); break
-                    curSegment = segData.containingSegment[originalLoc] #find the current segment and refine it to the appropriate level
+                if area in ["section", "subsection", "paragraph", "subparagraph"]:
+                    interval = None
+                    sL = localLoc
+                    if sL is None: showError("Could not find local sectionLabel for collection production.", location = self.decoratedText); continue
+                    sL = sL.truncateSectionLabel(area)
+                    if sL is not None: interval = SectionLabelLib.SectionLabelInterval(sectionData=sdata,sLList = [sL])
+                    else: showError("Could not create truncated interval list for this \"" + area + "\" (" + str(localLoc), location=self.decoratedText)
+                    if interval is not None: intervalList.append(interval)
+                    else: showError("Could not find this \"" + area + "\"", location=self.decoratedText)
+                    pass
+                elif area in ["part","division", "subdivision"]:
+                    if localLoc not in segData.containingSegment:
+                        showError("Could not find segment for SL: " + str(localLoc), location = self.decoratedText, color=True); break
+                    curSegment = segData.containingSegment[localLoc] #find the current segment and refine it to the appropriate level
                     if area == "part": curSegment = curSegment.getPart()
                     elif area == "division": curSegment = curSegment.getDivision()
                     elif area == "subdivision": curSegment = curSegment.getSubdivision()
-                    if curSegment is None: showError("Could not find current segment [" + area + "] for: " + str(originalLoc), location = self.decoratedText)
+                    if curSegment is None: showError("Could not find current segment [" + area + "] for: " + str(localLoc), location = self.decoratedText)
                     else: #if we found a segment
                         contents = segData.segmentContents[curSegment]
                         intervalList.append(SectionLabelLib.SectionLabelInterval(sectionData=sdata,sLList=contents))
                     pass
-                else: showError("Unknown segment type: " + area, location=self.decoratedText)
+                else: showError("Unknown \"this\" type: " + area, location=self.decoratedText)
                 pass
             pass
         #add intervals for list of specific sections
         if "LOCAL" in self.sectionDict: localFragments = self.sectionDict["LOCAL"]
         else: localFragments = []
 
-        curLoc = originalLoc
+        curLoc = localLoc
         #mark the Fragments in our list with the corresponding target SLs
         for frag in localFragments:
-            if frag.isSeriesStart(): curLoc = originalLoc #reset curLoc each time we start a new series
+            if frag.isSeriesStart(): curLoc = localLoc #reset curLoc each time we start a new series
             tmpLoc = sdata.getSLFromString(frag.getText(), locationSL = curLoc, errorLocation=self.decoratedText)
             if tmpLoc is None: showError("Could not find SL for fragment: [" + frag.getText() + "]", location = self.decoratedText)
             else: curLoc = tmpLoc; frag.setTargetSL(curLoc)
@@ -477,8 +488,7 @@ class ApplicationParse(TextParse):
             if frag.hasTargetSL(): nextSLList.append(frag.getTargetSL())
             pass
         #if the nextSLList is not empty we clear it out producing one more interval
-        nextInterval = SectionLabelLib.SectionLabelInterval(sectionData=sdata, sLList=nextSLList)
-        intervalList.append(nextInterval)
+        if len(nextSLList) > 0: nextInterval = SectionLabelLib.SectionLabelInterval(sectionData=sdata, sLList=nextSLList); intervalList.append(nextInterval)
         return SectionLabelLib.SectionLabelCollection(sectionData=sdata,intervalList=intervalList)
 
 class SectionReferenceParse(TextParse):
