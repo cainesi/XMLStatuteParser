@@ -117,13 +117,18 @@ class Node(object):
         self.children.append(node)
         return
     def getRawText(self):
-        """Returns the plain text contents of the Node (and any subnodes), stripping leading/trailing spaces on interal text chunks.  Therefore the rawText will not necessarily have the correct spacing, since it will not have implied spaces from tags."""
+        """Returns the plain text contents of the Node (and any subnodes), stripping leading/trailing spaces on internal text chunks.  Therefore the rawText will not necessarily have the correct spacing, since it will not have implied spaces from tags."""
         return "".join(c.getRawText() for c in self.children)
     def getSpacedRawText(self):
         """Returns the plain text contents of Node (and subnode), including implied spaces where a tagged piece of text is immediately next to an alphanumeric character."""
-        #TODO
-        raise XMLStatException("Need to implement getSpacedRawText")
-        return 
+        l = [c.getSpacedRawText() for c in self.children]
+        total = "."
+        for s in l:
+            if len(s) == 0: continue
+            if total[-1].isalnum() and s[0].isalnum(): total += " " + s
+            else: total += s
+            pass
+        return total[1:]
         
     def englishMarginalText(self):
         """Returns the subtext of this node included in DefinedTermEn tags, otherwise returns None."""
@@ -170,6 +175,7 @@ class TextNode(Node):
         return self.text
     def getPrettyXML(self): return self.getXML()
     def getRawText(self): return self.text.strip() #strips the leading and trailing spaces on text pieces within the raw text
+    def getSpacedRawText(self): return self.getRawText()
     def addChild(self,node): raise XMLStatException("Cannot add children to TextNode.")
     pass
         

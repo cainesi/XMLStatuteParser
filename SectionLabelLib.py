@@ -83,10 +83,23 @@ class SectionLabel(object):
         return u"".join(n.getDisplayString() for n in self.numberings)
     def indentLevel(self): return sum(n.indentIncrement() for n in self.numberings)
     def hasLastEmptyDefinition(self):
-        """Returns True if one of the SectionLabel's numberings is an empty definition."""
+        """Returns True if the last of the SectionLabel's numberings is an empty definition."""
         if len(self.numberings) == 0: return False
-        if isinstance(self.numberings[-1],DefinitionNumbering) and self.numberings[-1].labelString == "": return True
+        if isinstance(self.numberings[-1],DefinitionNumbering) and self.numberings[-1].getLabelString() == "": return True
         return False
+    def hasLastDefinition(self):
+        """Returns True if the last of the SectionLabel's numberings is a definition.
+        @rtype: bool"""
+        if len(self.numberings) == 0: return False
+        if isinstance(self.numberings[-1],DefinitionNumbering): return True
+        return False
+    def getLastDefinitionString(self):
+        """Returns the definition contained in the last Numbering of the SectionLabel, if any.
+        @rtype: str"""
+        if len(self.numberings) == 0: return None
+        if not self.hasLastDefinition(): return None
+        return self.numberings[-1].getLabelString()
+
     def truncateSectionLabel(self,sectionType):
         """Returns a SectionLabel truncated to end at a Numbering of the specified type -- if no Numbering of the type is found, returns None.
         @rtype: SectionLabel
@@ -430,7 +443,6 @@ class SectionLabelInterval(object):
                 pass
             pass
         return
-
     def containsSL(self,sL):
         """Returns True if the given section label is contained in the interval, otherwise False.
         @type sL: SectionLabel
@@ -438,15 +450,19 @@ class SectionLabelInterval(object):
         n = self.sectionData[sL]
         if n >= self.start and n < self.end: return True
         return False
-
     def __len__(self):
         return self.start - self.end
-
     def __str__(self):
         if self.empty: return "<Range: empty>"
         return "<SectionInterval: "+ str(self.sectionData.numberToSL[self.start]) +" [#"+str(self.start) +"]---"+ str(self.sectionData.numberToSL[self.end-1]) +" [#"+str(self.end) +"]>"
     def __contains__(self,sL): return self.containsSL(sL)
-
+    def containsPosition(self,n):
+        """Returns True if the specified position number is within the interval.
+        @type n: int
+        @rtype: bool
+        """
+        if n >= self.start and n <= self.end: return True
+        return False
 
 class SectionLabelCollection(object):
     """Class representing an arbitrary collection of sections, broken up into intervals."""
@@ -465,14 +481,21 @@ class SectionLabelCollection(object):
         return "<SectionCollection:" + ";\t".join(str(c) for c in self.intervals) + ">"
     def __len__(self): return sum(len(c) for c in self.intervals)
     def __contains__(self,sL): return self.containsSL(sL)
-
+    def containsPosition(self,n):
+        """Returns True if the specified position number is within the section collection.
+        @type n: int
+        @rtype: bool
+        """
+        for interval in self.intervals:
+            if interval.containsPosition(n): return True
+        return False
 class UniversalSectionLabelCollection(object):
     """Object that the whole range of sections in the Statute."""
     def __init__(self,sectionData): self.sectionData = sectionData; return
     def containsSL(self): return True
     def __str__(self): return "<SectionUniversal>"
-    def __len__(self):
-        return len(self.sectionData.sectionList) * len(self.sectionData.sectionList) #amount that should be greater than the size of any non-universal collection
+    def __len__(self): return len(self.sectionData.sectionList) * len(self.sectionData.sectionList) #amount that should be greater than the size of any non-universal collection
+    def containsPosition(self,n): return True
 
 class Pinpoint(object):
     """Object that encapsulates the location of a citation (page and anchor strings)."""

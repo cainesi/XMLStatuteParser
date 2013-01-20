@@ -5,8 +5,8 @@ import Constants
 #Script to run the parser on every statute provided in the Statutes subdirectory, as a test.
 
 
-#statList = ["apca"]
-statList=["ITA"]
+statList = ["apca"]
+#statList=["ITA"]
 si = StatuteIndex.StatuteIndex()
 
 

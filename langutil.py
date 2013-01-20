@@ -95,7 +95,7 @@ class LabelLocation(object):
         if local == True: self.local = True
         elif actName is not None: self.actName = actName
         else:
-            if (definition is None) or (definitionSectionFragment is None): raise LangUtilException("Reflection must specify one of local, actName or definition/definitionSection.")
+            if (definition is None) or (definitionSectionFragment is None): raise LangUtilException("LabelLocation must specify one of local, actName or definition/definitionSection.")
             self.definition=definition; self.definitionSectionFragment=definitionSectionFragment
             pass
         return
@@ -273,6 +273,18 @@ class TextParse(object):
         labString = self.eatLabel()
         if labString is None: self.restoreState(); return None
         return LabelLocation(definition=defTerm, definitionSectionFragment=labString)
+    rscPat = re.compile(", chapter (?P<chapter>\d+) of the Revised Statutes of Canada, (?P<year>\d+)")
+    def eatChapterAndYear(self):
+        """Eats the text of a reference to a chapter of the RSC, as in ", chapter 148 of the Revised Statutes of Canada, 1952"
+        @rtype: str
+        """
+        self.saveState()
+        m = TextParse.rscPat.match(self.text, self.ptr)
+        if m is None: self.restoreState(); return None
+        self.ptr = m.end()
+        self.discardState()
+        return m.group(0)
+
     def eatActLocation(self):
         """
         Attempts to eat a description of the location that the sections are drawn from, such as from the list below:
@@ -312,11 +324,16 @@ class TextParse(object):
 
         actWords = []
         #special cases for references to the "Act" or the "Regulations"
-        if nextWord == "Act": return LabelLocation(actName="Act")
-        elif nextWord == "Regulations": return LabelLocation(actName="Regulations")
+        if nextWord == "Act": self.discardState(); return LabelLocation(actName="Act")
+        elif nextWord == "Regulations": self.discardState(); return LabelLocation(actName="Regulations")
         while nextWord is not None:
             actWords.append(nextWord)
-            if nextWord == "Act": self.discardState(); return LabelLocation(actName=" ".join(actWords))
+            if nextWord == "Act":
+                actStr = " ".join(actWords)
+                chapStr = self.eatChapterAndYear()
+                if chapStr is not None: actStr += chapStr
+                self.discardState()
+                return LabelLocation(actName=actStr)
             nextWord = self.eatWord()
             pass
 
@@ -327,6 +344,7 @@ class TextParse(object):
         showError("Unknown \"of\" type: no closing \"Act\": " + str(actWords), location = self.decoratedText)
         self.restoreState()
         return LabelLocation(local=True)
+
     def eatLabelSeries(self):
         """This is one of the key methods of the parser.  Eats a series of labels (e.g., "section 4, 2 and 7 [of the Fiseries Act]") and returns a tuple (location, list of fragments).  The location is "LOCAL" if the location is the local statute. The returns values are both None if there is no match.
         @rtype: str, list of Fragment
@@ -365,7 +383,8 @@ class ApplicationParse(TextParse):
     #TODO - code to add decorators
     #TODO - code to find single-definition subsections
     """Parser that automatically eats the text to determine the applicability range."""
-    initialPat = re.compile("^in|apply in|for the purposes of")
+    initialPat = re.compile("^in|apply in|for the purposes? of")
+    initialPatAlt = re.compile(", in") #e.g., 18(5)
     thisPat = re.compile("this (?P<thisType>[a-z]+)")
     def __init__(self, decoratedText):
         TextParse.__init__(self,decoratedText)
@@ -379,7 +398,9 @@ class ApplicationParse(TextParse):
     def eatStart(self):
         """Finds the spot in the text that corresponds to the start of the applicability range."""
         m = ApplicationParse.initialPat.search(self.ltext)
-        if m is None: return None
+        if m is None: #try to find an alternate start
+            m = ApplicationParse.initialPatAlt.search(self.ltext)
+            if m is None: return None
         self.ptr=m.end()
         self.eatSpace()
         return m.group(0)
@@ -389,7 +410,7 @@ class ApplicationParse(TextParse):
         if m is None: return None
         self.ptr += m.end()
         self.eatSpace()
-        if m.group("thisType") not in ["section","part","division","subdivision","act"]: showError("Unknown thisType: " + m.group("thisType"),location=self)
+        if m.group("thisType") not in ["section","act","subsection","part","division","subdivision"]: showError("Unknown \"thisType\": " + m.group("thisType"),location=self)
         return Fragment(m.group("thisType"),self.ptr+5) #fragment only includes the part of the this-reference after "this"
     def eatApplicationRange(self):
         """Eats a series of "this" references and section label lists. Returns a tuple (list of section label fragments, list of this type fragments)"""
@@ -452,7 +473,7 @@ class ApplicationParse(TextParse):
                     pass
                 elif area in ["part","division", "subdivision"]:
                     curSegment = segData.getContainingSegment(localLoc) #find the current segment and refine it to the appropriate level
-                    if curSegment is None: showError("Could not find segment for SL: " + str(localLoc), location = self.decoratedText); contiue
+                    if curSegment is None: showError("Could not find segment for SL: " + str(localLoc), location = self.decoratedText); continue
                     if area == "part": curSegment = curSegment.getPart()
                     elif area == "division": curSegment = curSegment.getDivision()
                     elif area == "subdivision": curSegment = curSegment.getSubdivision()
@@ -581,5 +602,26 @@ if __name__ == "__main__":
     print("\nTest 6")
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="Subject to subsections (8) and (8.1), for the purposes of this subsection and subsection (3),")
     #print(s.getText())
+    t = ApplicationParse(s)
+    t.showParseData()
+
+    print("\nTest 7")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply for the purpose of paragraph (1)(b).")
+    #print(s.getText())
+    t = ApplicationParse(s)
+    t.showParseData()
+
+    print("\nTest 8")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="In this section and paragraph 56(1)(d.1) of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,")
+    t = ApplicationParse(s)
+    t.showParseData()
+
+    print("\nTest 9")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="The following definitions apply in this section and in Part XI.01.")
+    t = ApplicationParse(s)
+    t.showParseData()
+
+    print("\nTest 9")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="Notwithstanding any other provision of this Act (other than subsection 18(5.1)), in this subsection and subsections 18(4) to 18(6),")
     t = ApplicationParse(s)
     t.showParseData()

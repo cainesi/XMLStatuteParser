@@ -152,6 +152,7 @@ class TextPiece(Piece):
     def eatsFollowingSpace(self):
         if len(self.text) > 0: return False
         else: return self.previousEatsSpace()
+
     pass
 
 class DefinedTermPiece(Piece):

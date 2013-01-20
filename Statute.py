@@ -4,7 +4,7 @@
 import os
 import Constants, SectionLabelLib
 import XMLStatParse
-import StatuteItem, langutil
+import StatuteItem, langutil, DecoratedText
 import RenderContext
 from ErrorReporter import showError
 
@@ -90,6 +90,7 @@ class Statute(object):
         self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
         self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
         self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
+        self.definitionData.applyToAll()
         #self.definitionData.displayDefinedTerms()
         #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
@@ -165,14 +166,12 @@ class Statute(object):
         @rtype: SectionLabelLib.SectionData
         """
         return self.sectionData
-
     def getSegmentData(self):
         """
         Returns segmentData (information of parts/divisions/subdivisions) for the Statute.
         @rtype: SectionLabelLib.SegmentData
         """
         return self.segmentData
-
 
     ###
     #
@@ -290,10 +289,13 @@ class DefinitionData(object):
         @type statute: Statute
         """
         self.statute = statute
-        self.definedTermRanges = {} #dictionary indexed by defined terms, where each entry is a tuple (sourceitem, application range)
+        self.definedTermRanges = {} #dictionary indexed by defined terms, where each entry is a list of (sourceitem, application range)
         self.applicationRange = {} #dictionary indexed by sL, and giving the application range specified by that sL.
         self.scopeDefinedTerms()
+        self.definedTermList = self.definedTermRanges.keys() #make a list of defined terms, indexed by decreasing size
+        self.definedTermList.sort(key=lambda x: -len(x))
         self.sectionData = self.statute.getSectionData()
+        self.statuteData = self.statute.getStatuteData()
         return
 
     def scopeDefinedTerms(self):
@@ -320,20 +322,51 @@ class DefinitionData(object):
                     pass
                 pass
             pass
-
-        #output list of definition headers, for testing purposes
-#        sLList = itemDict.keys()
-#        sLList.sort(key=self.sectionData.getSLPosition) #TODO: replace with key function
-#        for sL in sLList:
-#            item = itemDict[sL]
-#            print("========")
-#            print(sL)
-#            print(item.getInitialTextItem().getText().encode("UTF-8"))
-#            dt = itemDict[sL].getInitialTextItem().getDecoratedText()
-#            ap = langutil.ApplicationParse(dt)
-#            ap.showParseData()
-#            pass
+    def applyToAll(self):
+        """Adds Decorators to the entire Statute."""
+        for item in self.statute.itemIterator():
+            if isinstance(item,StatuteItem.TextItem):
+                dt = item.getDecoratedText()
+                self.applyToDecoratedText(decoratedText=dt)
+                pass
+            pass
         return
+
+    def applyToDecoratedText(self,decoratedText):
+        """Adds Decorators to the DecoratedText for the applicable definitions.
+        @type decoratedText: DecoratedText.DecoratedText
+        @rtype: None
+        """
+        text = decoratedText.getText().lower()
+        sL = decoratedText.getSectionLabel()
+        position = self.sectionData.getSLPosition(sL)
+        hits = self.applyToText(text=text,position=position)
+        for start,end,pinpoint in hits:
+            ld = DecoratedText.LinkDecorator(parent=decoratedText, start=start,end=end,pinpoint=pinpoint)
+            decoratedText.addDecorator(ld)
+            pass
+        return
+
+    def applyToText(self,text,position):
+        """Returns at list of intervals where defined terms were found, and the item of the corresponding
+        @type text: str
+        @type position: int
+        @rtype: list of (int, int, SectionLabelLib.PinPoint)
+        """
+        #TODO: write a version that works with section labels.
+        l = []
+        for term in self.definedTermList: #go through defined terms
+            for source, appRange in self.definedTermRanges[term]: #go through all definitions for each defined term
+                if not appRange.containsPosition(position): continue #if definition not applicable, continue
+                ptr = text.find(term)
+                while ptr != -1: #otherwise, iterate through all instances
+                    sL = source.getSectionLabel()
+                    l.append( (ptr, ptr+len(term), self.statuteData.getPinpoint(sL)) )
+                    ptr = text.find(term,ptr+1)
+                pass
+            pass
+        return l
+
     def displayDefinedTerms(self):
         """Prints out a listing of the defined terms."""
         terms = self.definedTermRanges.keys()

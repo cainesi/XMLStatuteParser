@@ -92,7 +92,9 @@ class BaseItem(StatutePart):
             if isinstance(item,TextItem): return item
         return None
     def getRawText(self,limit=500):
-        """Returns raw text of the item (used for debugging)."""
+        """Returns raw text of the item (used for debugging).
+        @rtype: str
+        """
         remainder = limit
         l = []
         for item in self.items:
@@ -189,8 +191,13 @@ class SectionItem(BaseItem):
         paragraphs = []
         needForce = True #need to explicitly force a new paragraph on a subitem paragraph
         if self.marginalNote is not None: paragraphs.append(Paragraph(text=self.marginalNote, renderContext=renderContext, isMarginalNote=True)); needForce = False
+        #add anchor
+
         if not skipLabel:
-            if self.getLabelString() is not None: paragraphs.append(Paragraph(text=renderContext.boldText(self.getLabelString()), renderContext=renderContext,forceNewParagraph=True, indentLevel=self.getIndentLevel(), softSpace=True) ); needForce = False
+            anchor = renderContext.renderAnchor(self.statute.getStatuteData().getAnchor(self.getSectionLabel()))
+            needForce = False #because we've forced new paragraph with the anchor
+            paragraphs.append( Paragraph(text=anchor, renderContext=renderContext, indentLevel=self.getIndentLevel(),forceNewParagraph=True ) )
+            if self.getLabelString() is not None: paragraphs.append(Paragraph(text=renderContext.boldText(self.getLabelString()), renderContext=renderContext, indentLevel=self.getIndentLevel(), softSpace=True) )
         paragraphs += self.getSubParagraphs(renderContext)
         if self.historicalNote is not None: paragraphs.append(Paragraph(text=self.historicalNote,renderContext=renderContext,forceNewParagraph=True,indentLevel=self.getIndentLevel()))
 
@@ -209,11 +216,52 @@ class DefinitionItem(SectionItem):
         SectionItem.__init__(self,parent, tree)
         self.definedTerms = [] #collect list of all terms defined in this definition section
         for item in self.items:
-            if isinstance(item,TextItem): self.definedTerms += [c.lower() for c in item.getDefinedTerms()]
+            if isinstance(item,TextItem): self.definedTerms += [c for c in item.getDefinedTerms()]
             pass
-        #TODO: should somehow reconcile the list of defined terms with the sections's SectionLabel object (in some cases they are inconsistent in the XML.
-        if self.sectionLabel.hasLastEmptyDefinition(): #show an error if we have an empty defined term in the sectionLabel (except for repealed provisions, which we don't really care about.
+        self.termDefined = None
+        self.verifyDefinition()
+        return
+
+    def verifyDefinition(self):
+        """Internal method that reconciles the definitions indicated by the text and the SL.  Sets the internal self.termDefined member that indicates which term is being defined by this item.
+        @rtype: None"""
+
+        #get definition from the SL
+        labelDef = None
+        if not self.sectionLabel.hasLastDefinition(): #show error if the sectionlabel doesn't reflect this as a definition
+            showError("SL does not end with definition, for DefinitionItem.", location=self)
+        elif self.sectionLabel.hasLastEmptyDefinition(): #show an error if we have an empty defined term in the sectionLabel (except for repealed provisions, which we don't really care about.
             if "repealed" not in self.getRawText(limit=100).lower(): showError("Empty definition.", location=self)
+        else: labelDef = self.sectionLabel.getLastDefinitionString() #definition according to the SL
+        if labelDef is not None: labelDef = labelDef.lower()
+
+        #get definition from the text
+        textDef = None
+        if len(self.definedTerms) == 0:
+            showError("DefinitionItem with no definedTerms.", location=self)
+            pass
+        else:
+            if len(self.definedTerms) > 1:
+                #showError("Asking for defined terms in a DefinitionItem with multiple defined terms: "+ str(self.definedTerms), location=self) #these multiple definition are not unusual, better to check for consistency with labelling
+                pass
+            textDef = self.definedTerms[0]
+            pass
+        if textDef is not None: textDef = textDef.lower()
+
+        if labelDef is None and textDef is None:
+            showError("DefinitionItem with no definition specified in any manner.", location=self)
+            self.termDefined = ""
+            return
+        if labelDef is None: self.termDefined = textDef; return
+        if textDef is None: self.termDefined = labelDef; return
+        if labelDef != textDef: #show error if there is inconsistency between definitions.
+            #showError("Inconsistent label and text definition. txt:["+textDef+"] lbl:["+labelDef+"]",location=self)
+            if labelDef != textDef[:len(labelDef)]:
+                showError("Label definition is not stem of text definition. txt:["+textDef+"] lbl:["+labelDef+"]",location=self)
+                pass
+            pass
+
+        self.termDefined = textDef #but either way, go with text definition.
         return
 
     def extractMetaData(self):
@@ -240,10 +288,8 @@ class DefinitionItem(SectionItem):
         """Returns the first defined term in them item.
         @rtype: str
         """
-        if len(self.definedTerms) == 0: return None
-        else:
-            if len(self.definedTerms) > 1: showError("Asking for defined terms in a DefinitionItem with multiple defined terms: "+ str(self.definedTerms), location=self)
-            return self.definedTerms[0]
+        return self.termDefined
+
     pass
 
 class FormulaItem(BaseItem):
@@ -346,9 +392,7 @@ class TextItem(BaseItem):
         #self.text, self.decorators = self.firstPiece.assembleText()
         self.definedTerms = self.decoratedText.getDefinedTerms() #list of defined terms appearing in this text block
         #TODO: extract defined terms from the applicable decorators
-
         return
-
     @staticmethod
     def isWrittenText(stack):
         """Returns True if the item contains any text that should be visible in the output."""
@@ -366,11 +410,11 @@ class TextItem(BaseItem):
         stack.append(tree.tag)
         for item in tree: #iterate over the subitems
             if item.tag == "definedtermen":
-                self.addPiece(textutil.DefinedTermPiece(parent=self,text=item.getRawText().strip()))
+                self.addPiece(textutil.DefinedTermPiece(parent=self,text=item.getSpacedRawText().strip()))
             elif item.tag == "xrefexternal":
-                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),pinpoint=None))
+                self.addPiece(textutil.LinkPiece(parent=self,text=item.getSpacedRawText(),pinpoint=None))
             elif item.tag =="xrefinternal":
-                self.addPiece(textutil.LinkPiece(parent=self,text=item.getRawText(),pinpoint=None))
+                self.addPiece(textutil.LinkPiece(parent=self,text=item.getSpacedRawText(),pinpoint=None))
             elif isinstance(item,XMLStatParse.TextNode):  #TextNode correspond to text in the xml file.  Only include if we are inside aof <Text> tags.
                 txt = item.getRawText().strip() #to strip off leading/trailing spaces / new lines
                 if txt == "": continue

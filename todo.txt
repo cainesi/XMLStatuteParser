@@ -3,10 +3,11 @@
 # X - written, not tested - Code in langutil that relies on Statute's sectionData in order to create applicability object
 # X - Write code to store certain information on statue labels into StatuteData Object - have code to copy in the sectionNameDict
 # X - reference series conversion should revert to using local label as base at each new label series -- appropriate Fragments are now marked as "seriesStart" to accomplish this
-# correct definitions that are not fully captured in SectionLabel.
+# X - correct definitions that are not fully captured in SectionLabel.
+# X - Finish code to add decorators for section references
+# X - Code to find defined terms
 # Avoid parsing application ranges in "read as" provisions.
 # Code to find one-off definitions
-# Finish code to add decorators for section references
 # Add code to StatuteData object to direct location cites to the correct other statuteData.
 # Add code to stat_config.txt to determine which statutes are parsed or ignored
 # Code in StatuteIndex to convert series of Fragments into references (if references can be found).
@@ -22,3 +23,4 @@
 # Code to add disclaimer footer on each page
 # Code to add decorators for historical notes (should be able to lift this from prior project)
 # Code to add tables of referencing sections / regulations (have the decorators store the target sectionLabel/instrument as well as the page/anchor, so that we can walk the decorators and find cross-refernces; or have the StatuteIndex keep track of the cross-links as they are querried?).
+# Still some problems with handling around italics.  Maybe we should change the getRawText method?
