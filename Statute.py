@@ -6,6 +6,7 @@ import Constants, SectionLabelLib
 import XMLStatParse
 import StatuteItem, langutil, DecoratedText
 import RenderContext
+import util
 from ErrorReporter import showError
 
 #workflow for parsing statute:
@@ -60,6 +61,8 @@ class Statute(object):
         self.statuteName = statuteName
         self.statuteIndex = statuteIndex
         self.statuteData = self.statuteIndex[self.statuteName]
+        self.renderContext = RenderContext.WikiContext
+
         data = self.statuteData.getRawXML()
 
         p = XMLStatParse.XMLStatuteParser()
@@ -84,6 +87,7 @@ class Statute(object):
         self.contentTree = self.mainPart["body"]
         self.processStatuteData(self.identTree) #extract meta-data about the statute from the xml
         self.processStatuteContents(self.contentTree) #extract the contents of the statute
+
         return
     #TODO, after testing, make the following part of the initialization (we've separated it out so that object can be assigned before this code is run)
     def doProcess(self):
@@ -264,17 +268,73 @@ class Statute(object):
 
     def renderPages(self): #TODO: this code is just a stop-gap for testing purposes
         """Renders a page for each top-level sectionItems."""
-        for sectionItem in self.sectionList:
-            self.renderPage(sectionItem)
+        #TODO - render TOC
+
+        #TODO - render currency page
+
+        #render pages
+
+        for previousItem,sectionItem,nextItem in util.triples(self.sectionList): self.renderPage(sectionItem,previousItem=previousItem,nextItem=nextItem)
         return
-    def renderPage(self,sectionItem):
+
+
+    def renderPage(self,sectionItem,previousItem,nextItem):
         """Renders the page for a sectionItem (assumed to be top-level)."""
         lab = sectionItem.getSectionLabel()[0].getIDString()
+
         f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab,"w")
-        f.write(sectionItem.getRenderedText(RenderContext.WikiContext,skipLabel=True).encode("utf-8"))
+
+        page = u""
+
+        #header
+        # - page title
+        page += self.renderContext.renderHeading(lab,1)
+        page += self.renderContext.newLine()
+
+        # - next/previous page
+        prevExplanation = None
+        nextExplanation = None
+        if previousItem is None: previousStr = "(prev)"
+        else:
+            prevSL = previousItem.getSectionLabel()
+            previousPin = self.statuteData.getPinpoint(prevSL)
+            previousStr = self.renderContext.renderPinpoint(previousPin, "(prev)")
+            prevExplanation = "(previous section: " + prevSL.getIDString() + ")"
+            pass
+        if nextItem is None: nextStr = "(next)"
+        else:
+            nextSL = nextItem.getSectionLabel()
+            nextPin = self.statuteData.getPinpoint(nextSL)
+            nextStr = self.renderContext.renderPinpoint(nextPin, "(next)") # + nextSL.getIDString() + "]")
+            nextExplanation = "(next section: " + nextSL.getIDString() + ")"
+            pass
+        page += previousStr + " " + nextStr
+        page += self.renderContext.newLine()
+        if prevExplanation is not None:
+            page += prevExplanation
+            page += self.renderContext.newLine()
+            pass
+        if nextExplanation is not None:
+            page += nextExplanation
+            page += self.renderContext.newLine()
+            pass
+        page += self.renderContext.horizontalLine()
+        page += self.renderContext.newLine()
+
+        #page contents
+        page += sectionItem.getRenderedText(self.renderContext,skipLabel=True)
+        page += self.renderContext.newLine()
+        #disclaimer
+        page += self.renderContext.horizontalLine()
+        page += self.renderContext.newLine()
+
+        f.write(page.encode("utf-8"))
         f.close()
         return
     pass
+
+    def disclaimer(self):
+        return
 
 class DummyStatute(object):
     def __init__(self):
