@@ -283,7 +283,6 @@ class Statute(object):
         lab = sectionItem.getSectionLabel()[0].getIDString()
 
         f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab,"w")
-
         page = u""
 
         #header
@@ -324,7 +323,13 @@ class Statute(object):
         #page contents
         page += sectionItem.getRenderedText(self.renderContext,skipLabel=True)
         page += self.renderContext.newLine()
-        #disclaimer
+
+        #footer
+        # - citing sections (what objects we take references from should be configurable)
+
+        # - citing bulletins
+
+        # - disclaimer
         page += self.renderContext.horizontalLine()
         page += self.renderContext.newLine()
 
