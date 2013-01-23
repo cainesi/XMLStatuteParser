@@ -1,5 +1,4 @@
 
-import RenderContext
 import XMLStatParse
 from Constants import sectionTypes, formulaSectionTypes, formulaSectionMap, textTypes, knownTextTags, textTriggers
 import Constants
@@ -437,7 +436,7 @@ class TextItem(BaseItem):
         @rtype: DecoratedText.DecoratedText
         """
         return self.decoratedText
-    def getRenderedText(self, renderContext):
+    def getRenderedText(self, renderContext,skipLabel=False):
         """Calls the getDecoratedText method on the underlying DecoratedText object, with the supplied RenderContext."""
         return self.decoratedText.getRenderedText(renderContext)
     def getParagraphs(self, renderContext, skipLabel = False):

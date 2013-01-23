@@ -30,10 +30,8 @@ from ErrorReporter import showError
 # The structure of StatuteItems is then walked to extract certain data about the overall structure of the statute
 #       A) SegmentData - organization of sections into Parts/Divisions/etc
 #       B) SectionData - enumeration of sectionLabel items in the structure --- allows relative position of sections to be determined
-# (TODO) Each of the sections in the statute is walked in order to parse definitions, cross-references, etc.
 # (TODO) The statute is bound against other statutes or dictionaries in order to resolve certain cross references, etc. (regs to statutes, etc)
 # wikipage/html output is generated
-
 
 # TODOs:
 # - add an index of look-up dictionaries of sectionLabels to the Statute object initialization, and generation of the indices from completed statute.
@@ -71,7 +69,7 @@ class Statute(object):
         if verbose: print "[XML file read]"
         self.instrumentType = None
         self.enablingAuthority = None
-        if "statute" in dataTree:
+        if "statute" in dataTree: #figure out if we are dealing with statute or regulation, and extract the appropriate part of data tree.
             self.instrumentType = "statute"
             self.mainPart = dataTree["statute"]
         elif "regulation" in dataTree:
@@ -262,7 +260,7 @@ class Statute(object):
 
     ###
     #
-    # File output methods.
+    # File / Rendering output methods.
     #
     ###
 
@@ -275,48 +273,28 @@ class Statute(object):
         #render pages
 
         for previousItem,sectionItem,nextItem in util.triples(self.sectionList): self.renderPage(sectionItem,previousItem=previousItem,nextItem=nextItem)
+        self.renderCurrencyPage()
         return
 
 
     def renderPage(self,sectionItem,previousItem,nextItem):
-        """Renders the page for a sectionItem (assumed to be top-level)."""
+        """Renders the page for a sectionItem (assumed to be top-level).
+        @type sectionItem: StatuteItem.SectionItem
+        @type previousItem: StatuteItem.SectionItem
+        @type nextItem: StatuteItem.SectionItem
+        """
         lab = sectionItem.getSectionLabel()[0].getIDString()
 
-        f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab,"w")
         page = u""
 
         #header
         # - page title
-        page += self.renderContext.renderHeading(lab,1)
+        page += self.renderContext.renderHeading(self.statuteData.getName() + " " + lab,1)
         page += self.renderContext.newLine()
 
         # - next/previous page
-        prevExplanation = None
-        nextExplanation = None
-        if previousItem is None: previousStr = "(prev)"
-        else:
-            prevSL = previousItem.getSectionLabel()
-            previousPin = self.statuteData.getPinpoint(prevSL)
-            previousStr = self.renderContext.renderPinpoint(previousPin, "(prev)")
-            prevExplanation = "(previous section: " + prevSL.getIDString() + ")"
-            pass
-        if nextItem is None: nextStr = "(next)"
-        else:
-            nextSL = nextItem.getSectionLabel()
-            nextPin = self.statuteData.getPinpoint(nextSL)
-            nextStr = self.renderContext.renderPinpoint(nextPin, "(next)") # + nextSL.getIDString() + "]")
-            nextExplanation = "(next section: " + nextSL.getIDString() + ")"
-            pass
-        page += previousStr + " " + nextStr
+        page += self.nextPreviousBlock(previousItem=previousItem,nextItem=nextItem)
         page += self.renderContext.newLine()
-        if prevExplanation is not None:
-            page += prevExplanation
-            page += self.renderContext.newLine()
-            pass
-        if nextExplanation is not None:
-            page += nextExplanation
-            page += self.renderContext.newLine()
-            pass
         page += self.renderContext.horizontalLine()
         page += self.renderContext.newLine()
 
@@ -333,13 +311,76 @@ class Statute(object):
         page += self.renderContext.horizontalLine()
         page += self.renderContext.newLine()
 
+        f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab,"w")
         f.write(page.encode("utf-8"))
         f.close()
         return
     pass
 
-    def disclaimer(self):
+    def renderCurrencyPage(self):
+        """Renders the page giving the currency data for the statute."""
+        page = u""
+        page += self.renderContext.renderHeading(self.statuteData.getFullName() + ": " + "Currency Information",1)
+        page += self.renderContext.newLine()
+        page += self.renderContext.horizontalLine()
+        page += self.renderContext.newLine()
+        s = self.longTitle
+        longTitleStr =  self.renderContext.italicText( self.longTitle )
+        if s[:3].lower() == "an " or s[:4].lower() == "the ": pass
+        else: longTitleStr = "the " + longTitleStr
+        if self.isRegulation(): longTitleStr += ", " + self.enablingAuthorty + ","
+        else: longTitleStr += ", " + self.citationString + ","
+
+
+        page += "The copy of the " + self.statuteData.getFullName()+ " provided here is based on the XML version of "+ longTitleStr + " downloaded from the website of the Department of Justice at " + self.statuteData.getBundleUrl() + " on " + self.statuteData.getDownloadDate().strftime("%B %-e, %Y") + " (current to " + self.statuteData.getCurrencyDate().strftime("%B %-e, %Y") + ")."
+
+        f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + "Currency","w")
+        f.write(page.encode("utf-8"))
+        f.close()
         return
+
+    def nextPreviousBlock(self,previousItem,nextItem):
+        """Renders a block of text with backwards / forwards links.
+        @type previousItem: StatuteItem.SectionItem
+        @type nextItem: StatuteItem.SectionItem
+        """
+        text = u""
+        prevExplanation = None
+        nextExplanation = None
+        if previousItem is None: previousStr = "(prev)"
+        else:
+            prevSL = previousItem.getSectionLabel()
+            previousPin = self.statuteData.getPinpoint(prevSL)
+            previousStr = self.renderContext.renderPinpoint(previousPin, "(prev)")
+            prevExplanation = "(previous section: " + prevSL.getIDString() + ")"
+            pass
+        if nextItem is None: nextStr = "(next)"
+        else:
+            nextSL = nextItem.getSectionLabel()
+            nextPin = self.statuteData.getPinpoint(nextSL)
+            nextStr = self.renderContext.renderPinpoint(nextPin, "(next)") # + nextSL.getIDString() + "]")
+            nextExplanation = "(next section: " + nextSL.getIDString() + ")"
+            pass
+        text += previousStr + " " + nextStr
+        #text += self.renderContext.newLine()
+        if prevExplanation is not None:
+            text += self.renderContext.newLine()
+            text += prevExplanation
+            pass
+        if nextExplanation is not None:
+            text += self.renderContext.newLine()
+            text += nextExplanation
+            pass
+        return text
+
+    def disclaimerBlock(self):
+        #TODO: fill in email address
+        disclaimerText = "This material is based on the text of the " + self.statuteData.getName() + ", available from the website of the Department of Justice at " + self.statuteData.getBundleUrl() + " (" + self.renderContext.renderPageLink(pageName=self.currencyPageName(), text="currency information") + "), but has not been produced in affiliation with, or with the endorsement of the Government of Canada.  This material has been produced by programmatic means, has not been reviewed for accuracy, and is likely to contain a variety of errors.  We would appreciate hearing about any errors, or any other suggestions for improvement, at [FILL IN EMAIL]." # + renderContext.mailTo("comments@taxwiki.ca|comments@taxwiki.ca") + "."
+        return disclaimerText
+
+    def currencyPageName(self):
+        return self.statuteData.getPrefix() + " " + "Currency Information"
+
 
 class DummyStatute(object):
     def __init__(self):

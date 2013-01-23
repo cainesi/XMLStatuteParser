@@ -58,6 +58,8 @@ class StatuteIndex(object):
                 self.statuteList.append(curStat.getName())
                 pass
             elif curStat is None: raise StatuteIndexException("Error in " + Constants.STATUTECONFIGFILE +", value specified before any name [line:" + str(lineno) + "][" + line + "]")
+            elif tag == "fullname": curStat.setFullName(value)
+            elif tag == "prefix": curStat.setPrefix(value)
             elif tag == "url": curStat.setUrl(value)
             elif tag == "act": curStat.setAct(value)
             elif tag == "reg": curStat.setReg(value)
@@ -116,13 +118,12 @@ class StatuteData(object):
         #following contain metadata about the section contents of the statute and should be updated each time the statute is parsed.
         self.index = index
         self.name = name
-        self.prefix = prefix
-        if self.prefix is None: self.prefix = self.name #set prefix to name, if not otherwise set
-        else: self.prefix=prefix
+        self.prefix = prefix #file prefix for this statute, if any
         self.act = act
         self.reg = reg
         self.url = url
         self.fileOnly = fileOnly
+        self.fullName = None #full name of act for display purposes (if any)
         self.bundle = None #the statute bundle for this statute, is set once loaded
         self.rawName = None #filename where XML content can be located on disk (only useful if fileOnly is set)
         self.noCheck = False #if True, then url will not be check if xml already available locally
@@ -133,7 +134,18 @@ class StatuteData(object):
         return
     def __str__(self): return "<StatuteData: name:["+ str(self.name)+"] url:["+str(self.url)+"]>"
     def getName(self): return self.name
-    def getPrefix(self): return self.prefix
+    def setPrefix(self,prefix):
+        self.prefix = prefix
+        return
+    def getPrefix(self):
+        if self.prefix is None: return self.name
+        return self.prefix
+    def setFullName(self,fullName):
+        self.fullName= fullName
+        return
+    def getFullName(self):
+        if self.fullName is None: return self.name
+        return self.fullName
     def setAct(self,actName):
         if self.act is not None: raise StatuteIndexException("Setting act when act already specified ["+str(self)+"]["+self.act+"]["+actName+"]")
         self.act = actName
@@ -167,7 +179,8 @@ class StatuteData(object):
         """Returns the filename for a current back of the statue bundle."""
         return os.path.join(Constants.OLDSTATUTEDIR,self.name + ".bundle" + "-" + datetime.datetime.today().strftime("%Y-%m-%d+%Hh-%Mm-%Ss"))
     def getRawXML(self): self.getBundle(); return self.bundle["XMLDATA"]
-    def getURL(self): self.getBundle(); return self.bundle["URL"]
+    def getXMLUrl(self): self.getBundle(); return self.bundle["XMLURL"]
+    def getBundleUrl(self): self.getBundle(); return self.bundle["URL"]
     def getAmendDate(self): self.getBundle(); return self.bundle["AMEND"]
     def getCurrencyDate(self): self.getBundle(); return self.bundle["CURRENCY"]
     def getDownloadDate(self): self.getBundle(); return self.bundle["DOWNLOAD"].date()
@@ -290,7 +303,7 @@ class StatuteData(object):
         @type sL: SectionLabelLib.SectionLabel
         @rtype: str
         """
-        return self.prefix + " " + sL[0].getIDString()
+        return self.getPrefix() + " " + sL[0].getIDString()
     def getAnchor(self,sL):
         """
         @type sL: SectionLabelLib.SectionLabel

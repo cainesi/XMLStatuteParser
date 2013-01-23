@@ -4,6 +4,8 @@
 
 """Classes including code for rendering text/links for different contexts, such as HTML pages, and wikipages."""
 
+#TODO: clean up the rendering methods that are provided, some are no longer needed with the current parser
+
 import re
 
 badStrings = [("&#8217;","'"),("&#8220;","\""),("&#8221;","\""),("&#8212;","--")]
@@ -36,6 +38,9 @@ class RenderContext:
         return classobj.indentText(text,level)
     @staticmethod
     def renderPinpoint(pinpoint, text=None):
+        return ""
+    @staticmethod
+    def renderPageLink(pageName,text=None):
         return ""
     #TODO: following two methods are redundant now that renderPinpoint has been added.
     @staticmethod
@@ -97,6 +102,11 @@ class WikiContext(RenderContext):
         else: linkText = text
         targetString = pinpoint.getPage() + "#" + pinpoint.getAnchor()
         return "[[" + targetString+ "|" +linkText + "]]"
+    @staticmethod
+    def renderPageLink(pageName,text=None):
+        if text is None: linkText = pageName
+        else: linkText = text
+        return "[[" + pageName + "|" + linkText + "]]"
     @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):
         """renders a link in the current context. targetSection is the section to link to, targetAnchor is the anchor in the section, linkText is the text of the link."""

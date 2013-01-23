@@ -19,6 +19,8 @@ Act: "ITA"
 Name: "apca"
 Url: "http://laws-lois.justice.gc.ca/eng/acts/C-49/index.html"
 noCheck: ""
+fullname: "Advance Payment for Crops Act"
+prefix: "apc"
 
 Name: "test1"
 Rawname: "ita14.xml"

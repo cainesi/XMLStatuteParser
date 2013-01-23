@@ -4,7 +4,7 @@ import HTMLParser, re
 import xsutil #code to interfact with external C-code library
 from ErrorReporter import showError
 
-"""The module provides code that converts an xml file representing a statute (as found in the Justice Department website) and creates an in-memory represenation of it that can be taken as input by the statute parsing code in the Statute module."""
+#The module provides code that converts an xml file representing a statute (as found in the Justice Department website) and creates an in-memory represenation of it that can be taken as input by the statute parsing code in the Statute module.
 
 # HACK -- the HTMLParser isn't really a xml parser (most notably, not case sensitive) -- should update this to use xml.parsers.expat
 
@@ -111,7 +111,7 @@ class Node(object):
         """Similar to getXML, but includes newlines and indentation in xml output, to make it easier to read."""
         if self.rawText[-2] == "/" and len(self.children) > 0: raise XMLStatException("[XMLStat NOTICE Unexpected children: %s]"%self.rawText)
         return self.rawText + ("\n" if len(self.children)>0 else "") + "\n".join(indentString(c.getPrettyXML()) for c in self.children)+ ("\n</" + self.rawText[1:1+len(self.tag)] + ">" if self.rawText[-2] != "/" else "")
-        return
+
     def addChild(self,node):
         """Add a child node to this Node."""
         self.children.append(node)
@@ -184,7 +184,7 @@ class PINode(object):
     def __init__(self, data):
         self.data = data
         return
-    def __str__(self): return "[PI: " + self.getHTML() + "]"
+    def __str__(self): return "[PI: " + self.data + "]"
     def baseStr(self): return "[PI]"
     def getXML(self): return "<?" + self.data +">"
     pass
