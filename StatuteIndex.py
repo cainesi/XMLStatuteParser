@@ -11,7 +11,7 @@ __author__ = 'caines'
 
 #TODO: rename this StatuteMetaData, and include the DefinitionData object?
 
-import pickle, shutil, re, os, datetime
+import pickle, re, os, datetime
 import Constants, StatuteFetch, Statute, SectionLabelLib
 from ErrorReporter import showError
 
@@ -89,8 +89,7 @@ class StatuteIndex(object):
         return Statute.Statute(statuteName=name,statuteIndex=self)
     def __getitem__(self,name):
         """Allow StatuteData objects to be fetched with [] notation.
-        @type statuteName: str
-        @type statuteIndex: StatuteIndex
+        @type name: str
         @rtype: StatuteData
         """
         return self.getStatuteData(name)
