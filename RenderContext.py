@@ -7,6 +7,7 @@
 #TODO: clean up the rendering methods that are provided, some are no longer needed with the current parser
 
 import re
+import urllib
 
 badStrings = [("&#8217;","'"),("&#8220;","\""),("&#8221;","\""),("&#8212;","--")]
 
@@ -80,7 +81,11 @@ class RenderContext:
     @staticmethod
     def mailTo(address):
         return ""
+    @staticmethod
+    def fileExtension():
+        return ""
     pass
+
 
 class WikiContext(RenderContext):
     @staticmethod
@@ -158,11 +163,11 @@ class WikiContext(RenderContext):
     pass
 
 class HTMLContext(RenderContext):
-    fileExtension = ".html"
     includesBulletins = False #in html, we won't necessarily have bulletins available.
     @staticmethod
     def cleanText(text):
-        return text
+        #TODO: fix for python 3
+        return urllib.quote(text.encode("utf8")).decode("utf8")
     @staticmethod
     def cleanPlainText(text):
         """method for cleaning raw text without any formatting."""
@@ -180,11 +185,22 @@ class HTMLContext(RenderContext):
     def indentText(text, level = 0):
         return ("<div style=\"padding-left: %dem;\">"%(level*3)) + text + "</div>\n"
     @staticmethod
+    def renderPinpoint(pinpoint, text=None):
+        if text is None: linkText = pinpoint.getText()
+        else: linkText = text
+        targetString = pinpoint.getPage() +HTMLContext.fileExtension() + "#" + HTMLContext.cleanText(pinpoint.getAnchor())
+        return "<a href=\"" + targetString + "\">" +linkText + "</a>"
+    @staticmethod
+    def renderPageLink(pageName,text=None):
+        if text is None: linkText = pageName
+        else: linkText = text
+        return "<a href=\"" + pageName +HTMLContext.fileExtension()+ "\">" + linkText + "</a>"
+    @staticmethod
     def renderLink(targetSection,targetAnchor=None,linkText=None):
-        linkUrl = targetSection + HTMLContext.fileExtension
+        linkUrl = targetSection + HTMLContext.fileExtension()
         if targetAnchor is not None: linkUrl += "#" + targetAnchor
         if linkText is None: linkText = targetSection + (targetAnchor if targetAnchor is not None else "")
-        linkText = HTMLContext.cleanPlainText(linkText)
+        #linkText = HTMLContext.cleanPlainText(linkText)
         return "<a href=\"%s\">%s</a>" %(linkUrl,linkText)
     @staticmethod
     def renderExternalLink(targetURL,linkText=None):
@@ -193,7 +209,8 @@ class HTMLContext(RenderContext):
         return "<a href=\"%s\">%s</a>" %(targetURL,linkText)
     @staticmethod
     def renderAnchor(anchorTarget):
-        return "<a name=\"%s\"></a>"%anchorTarget
+        cleanAnchor = HTMLContext.cleanText(anchorTarget)
+        return "<a name=\"%s\"></a>"%cleanAnchor
     @staticmethod
     def renderHeading(text,level):
         if level == 1: size=6
@@ -202,7 +219,7 @@ class HTMLContext(RenderContext):
         elif level == 4: size=4.25
         elif level == 0: size = 12
         else: size = 4.0
-        text = HTMLContext.cleanPlainText(text)
+        #text = HTMLContext.cleanPlainText(text)
         return "<font size=\"%.2f\">%s</font>"%(size, text)
     @staticmethod
     def renderTable(table):
@@ -222,4 +239,7 @@ class HTMLContext(RenderContext):
     @staticmethod
     def mailTo(address):
         return "<a href=\"mailto:%s\">%s</a>"%(address,address)
+    @staticmethod
+    def fileExtension():
+        return ".html"
     pass

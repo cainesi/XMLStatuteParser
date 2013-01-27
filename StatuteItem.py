@@ -37,11 +37,15 @@ class BaseItem(StatutePart):
         """Location of a BaseItem is given by its sectionLabel."""
         return self.getSectionLabel().getDisplayString()
     def getSectionLabel(self):
-        """Returns the sectionLabel of this object, or its parent if this item is not labeled."""
+        """Returns the sectionLabel of this object, or its parent if this item is not labeled.
+        @rtype: SectionLabelLib.SectionLabel
+        """
         if self.getImmediateSectionLabel() is not None: return self.getImmediateSectionLabel()
         else: return self.parent.getSectionLabel()
     def getImmediateSectionLabel(self):
-        """Returns the section label if this particular item, or None if self is not itself labeled."""
+        """Returns the section label if this particular item, or None if self is not itself labeled.
+       @rtype: SectionLabelLib.SectionLabel
+       """
         return None
     def getRenderedText(self,renderContext,skipLabel=False):
         """Get the text for this item, rendered according to the provided context."""
@@ -175,7 +179,8 @@ class SectionItem(BaseItem):
     def getMarginalNote(self):
         return self.marginalNote
     def getImmediateSectionLabel(self):
-        """Returns this item's sectionLabel, or None if no label.  Shows error if label has been finalized yet there is no sectionLabel."""
+        """Returns this item's sectionLabel, or None if no label.  Shows error if label has been finalized yet there is no sectionLabel.
+        @rtype: SectionLabelLib.SectionLabel"""
         if self.sectionLabel != None: return self.sectionLabel #the section label object pinpointing this provision
         if self.finalizedLabel:
             showError("SectionItem lacking immediate label ["+self.tree.tag+"]", location = self.parent) #if label finalized, no reason not to have sectionLAbel
@@ -280,7 +285,10 @@ class DefinitionItem(SectionItem):
                 pass
         return subsecs
     def getParagraphs(self,renderContext, skipLabel = False):
-        paragraphs =  self.getSubParagraphs(renderContext)
+        paragraphs = []
+        anchor = renderContext.renderAnchor(self.statute.getStatuteData().getAnchor(self.getSectionLabel()))
+        paragraphs.append( Paragraph(text=anchor, renderContext=renderContext, indentLevel=self.getIndentLevel(),forceNewParagraph=True ) )
+        paragraphs +=  self.getSubParagraphs(renderContext) #add in all text contained in the definitionItem
         if len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True #force first paragraph, if any, to start a new paragraph
         return paragraphs
     def getDefinedTerm(self):

@@ -59,7 +59,7 @@ class Statute(object):
         self.statuteName = statuteName
         self.statuteIndex = statuteIndex
         self.statuteData = self.statuteIndex[self.statuteName]
-        self.renderContext = RenderContext.WikiContext
+        self.renderContext = RenderContext.HTMLContext
 
         data = self.statuteData.getRawXML()
 
@@ -272,12 +272,13 @@ class Statute(object):
 
         #render pages
 
-        for previousItem,sectionItem,nextItem in util.triples(self.sectionList): self.renderPage(sectionItem,previousItem=previousItem,nextItem=nextItem)
+        for previousItem,sectionItem,nextItem in util.triples(self.sectionList): self.renderSectionPage(sectionItem,previousItem=previousItem,nextItem=nextItem)
         self.renderCurrencyPage()
+        self.renderIndexPage()
         return
 
 
-    def renderPage(self,sectionItem,previousItem,nextItem):
+    def renderSectionPage(self,sectionItem,previousItem,nextItem):
         """Renders the page for a sectionItem (assumed to be top-level).
         @type sectionItem: StatuteItem.SectionItem
         @type previousItem: StatuteItem.SectionItem
@@ -289,7 +290,7 @@ class Statute(object):
 
         #header
         # - page title
-        page += self.renderContext.renderHeading(self.statuteData.getName() + " " + lab,1)
+        page += self.renderContext.renderHeading(self.statuteData.getFullName() + " " + lab,1)
         page += self.renderContext.newLine()
 
         # - next/previous page
@@ -310,12 +311,13 @@ class Statute(object):
         # - disclaimer
         page += self.renderContext.horizontalLine()
         page += self.renderContext.newLine()
+        page += self.disclaimerBlock()
 
-        f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab,"w")
+        fname = os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab
+        f = open(fname+ self.renderContext.fileExtension(),"w")
         f.write(page.encode("utf-8"))
         f.close()
         return
-    pass
 
     def renderCurrencyPage(self):
         """Renders the page giving the currency data for the statute."""
@@ -328,13 +330,39 @@ class Statute(object):
         longTitleStr =  self.renderContext.italicText( self.longTitle )
         if s[:3].lower() == "an " or s[:4].lower() == "the ": pass
         else: longTitleStr = "the " + longTitleStr
-        if self.isRegulation(): longTitleStr += ", " + self.enablingAuthorty + ","
+        if self.isRegulation(): longTitleStr += ", " + self.enablingAuthority + ","
         else: longTitleStr += ", " + self.citationString + ","
 
 
-        page += "The copy of the " + self.statuteData.getFullName()+ " provided here is based on the XML version of "+ longTitleStr + " downloaded from the website of the Department of Justice at " + self.statuteData.getBundleUrl() + " on " + self.statuteData.getDownloadDate().strftime("%B %-e, %Y") + " (current to " + self.statuteData.getCurrencyDate().strftime("%B %-e, %Y") + ")."
+        page += "The copy of the " + self.statuteData.getFullName()+ " provided here is based on the " + self.renderContext.renderExternalLink(targetURL=self.statuteData.getXMLUrl(), linkText="XML version") + " of "+ longTitleStr + " downloaded from the website of the Department of Justice at " + self.renderContext.renderExternalLink(targetURL=self.statuteData.getBundleUrl()) + " on " + self.statuteData.getDownloadDate().strftime("%B %-e, %Y") + " (current to " + self.statuteData.getCurrencyDate().strftime("%B %-e, %Y") + ")."
+        fname = self.currencyPageName()
+        f = open(fname+ self.renderContext.fileExtension(),"w")
+        f.write(page.encode("utf-8"))
+        f.close()
+        return
 
-        f = open(os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + "Currency","w")
+    def renderIndexPage(self):
+        """Renders the index page for this statute."""
+        page = u""
+        #header
+        # - page title
+        page += self.renderContext.renderHeading("Contents" + " " + self.statuteData.getFullName(),1)
+        page += self.renderContext.newLine()
+        page += self.renderContext.horizontalLine()
+        page += self.renderContext.newLine()
+
+        for sectionItem in self.sectionList:
+            sL = sectionItem.getSectionLabel()
+            assert isinstance(sL, SectionLabelLib.SectionLabel)
+            pin = self.statuteData.getPinpoint(sL)
+            page += self.renderContext.renderPinpoint(pin, sL.getIDString())
+            page += self.renderContext.newLine()
+            pass
+        page += self.renderContext.horizontalLine()
+        page += self.renderContext.newLine()
+        page += self.disclaimerBlock()
+        fname =  self.indexPageName()
+        f = open(fname+ self.renderContext.fileExtension(),"w")
         f.write(page.encode("utf-8"))
         f.close()
         return
@@ -347,40 +375,39 @@ class Statute(object):
         text = u""
         prevExplanation = None
         nextExplanation = None
-        if previousItem is None: previousStr = "(prev)"
+        if previousItem is None: previousStr = None
         else:
             prevSL = previousItem.getSectionLabel()
             previousPin = self.statuteData.getPinpoint(prevSL)
-            previousStr = self.renderContext.renderPinpoint(previousPin, "(prev)")
-            prevExplanation = "(previous section: " + prevSL.getIDString() + ")"
+            previousStr = self.renderContext.renderPinpoint(previousPin, "(previous section: " + prevSL.getIDString() + ")")
             pass
-        if nextItem is None: nextStr = "(next)"
+        if nextItem is None: nextStr = None
         else:
             nextSL = nextItem.getSectionLabel()
             nextPin = self.statuteData.getPinpoint(nextSL)
-            nextStr = self.renderContext.renderPinpoint(nextPin, "(next)") # + nextSL.getIDString() + "]")
-            nextExplanation = "(next section: " + nextSL.getIDString() + ")"
+            nextStr = self.renderContext.renderPinpoint(nextPin, "(next section: " + nextSL.getIDString() + ")") # + nextSL.getIDString() + "]")
             pass
-        text += previousStr + " " + nextStr
-        #text += self.renderContext.newLine()
-        if prevExplanation is not None:
-            text += self.renderContext.newLine()
-            text += prevExplanation
+        if previousStr is not None:
+            text += previousStr
+            if nextStr is not None: text += self.renderContext.newLine()
             pass
-        if nextExplanation is not None:
-            text += self.renderContext.newLine()
-            text += nextExplanation
+        if nextStr is not None:
+            text += nextStr
             pass
         return text
 
     def disclaimerBlock(self):
         #TODO: fill in email address
-        disclaimerText = "This material is based on the text of the " + self.statuteData.getName() + ", available from the website of the Department of Justice at " + self.statuteData.getBundleUrl() + " (" + self.renderContext.renderPageLink(pageName=self.currencyPageName(), text="currency information") + "), but has not been produced in affiliation with, or with the endorsement of the Government of Canada.  This material has been produced by programmatic means, has not been reviewed for accuracy, and is likely to contain a variety of errors.  We would appreciate hearing about any errors, or any other suggestions for improvement, at [FILL IN EMAIL]." # + renderContext.mailTo("comments@taxwiki.ca|comments@taxwiki.ca") + "."
+        email = self.renderContext.mailTo("ian.caines@gmail.com")
+        disclaimerText = "This material is based on the text of the " + self.statuteData.getName() + ", available from the website of the Department of Justice at " + self.renderContext.renderExternalLink(targetURL=self.statuteData.getBundleUrl()) + " (" + self.renderContext.renderPageLink(pageName=self.currencyPageName(), text="currency information") + "), but has not been produced in affiliation with, or with the endorsement of the Government of Canada.  This material has been produced by programmatic means, has not been reviewed for accuracy, and is likely to contain a variety of errors.  We would appreciate hearing about any errors, or any other suggestions for improvement, at " + email + "." # + renderContext.mailTo("comments@taxwiki.ca") + "."
         return disclaimerText
 
+    #TODO: move page name definitions to SectionData object
     def currencyPageName(self):
-        return self.statuteData.getPrefix() + " " + "Currency Information"
+        return os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix() + " " + "Currency Information")
 
+    def indexPageName(self):
+        return os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix())
 
 class DummyStatute(object):
     def __init__(self):

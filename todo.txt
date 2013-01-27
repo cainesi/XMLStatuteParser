@@ -6,6 +6,7 @@
 # X - correct definitions that are not fully captured in SectionLabel.
 # X - Finish code to add decorators for section references
 # X - Code to find defined terms
+# extract the citation string (e.g., "R.S.C., 1985, c. C-49") from the main page for statute
 # Avoid parsing application ranges in "read as" provisions.
 # Code to find one-off definitions
 # Add code to StatuteData object to direct location cites to the correct other statuteData.
@@ -24,3 +25,4 @@
 # Code to add decorators for historical notes (should be able to lift this from prior project)
 # Code to add tables of referencing sections / regulations (have the decorators store the target sectionLabel/instrument as well as the page/anchor, so that we can walk the decorators and find cross-refernces; or have the StatuteIndex keep track of the cross-links as they are querried?).
 # Still some problems with handling around italics.  Maybe we should change the getRawText method?
+#PrettyPrint class to replace RenderContext (which will offer more intelligent global formatting)
