@@ -6,7 +6,8 @@
 # X - correct definitions that are not fully captured in SectionLabel.
 # X - Finish code to add decorators for section references
 # X - Code to find defined terms
-# !!! figure out what apostrophes are going wrong -- need to specify utf-8 in html files: <meta charset = "utf-8">
+# X - figure out what apostrophes are going wrong -- need to specify utf-8 in html files: <meta charset = "utf-8">
+# Fix indenting (should have an option in getRenderedText to reduce the indenting in the block --- more maybe have something in the pretty printer object, once that's arranged.)
 # put marginal notes in output
 # extract the citation string (e.g., "R.S.C., 1985, c. C-49") from the main page for statute
 # Avoid parsing application ranges in "read as" provisions.
