@@ -314,9 +314,9 @@ class Statute(object):
         page += self.disclaimerBlock()
 
         fname = os.path.join(Constants.PAGEDIR, self.statuteData.getPrefix()) + " " + lab
-        f = open(fname+ self.renderContext.fileExtension(),"w")
+        f = self.renderContext.openFile(fname=fname)
         f.write(page.encode("utf-8"))
-        f.close()
+        self.renderContext.closeFile(f)
         return
 
     def renderCurrencyPage(self):
@@ -336,9 +336,9 @@ class Statute(object):
 
         page += "The copy of the " + self.statuteData.getFullName()+ " provided here is based on the " + self.renderContext.renderExternalLink(targetURL=self.statuteData.getXMLUrl(), linkText="XML version") + " of "+ longTitleStr + " downloaded from the website of the Department of Justice at " + self.renderContext.renderExternalLink(targetURL=self.statuteData.getBundleUrl()) + " on " + self.statuteData.getDownloadDate().strftime("%B %-e, %Y") + " (current to " + self.statuteData.getCurrencyDate().strftime("%B %-e, %Y") + ")."
         fname = self.currencyPageName()
-        f = open(fname+ self.renderContext.fileExtension(),"w")
+        f = self.renderContext.openFile(fname=fname)
         f.write(page.encode("utf-8"))
-        f.close()
+        self.renderContext.closeFile(f)
         return
 
     def renderIndexPage(self):
@@ -362,9 +362,9 @@ class Statute(object):
         page += self.renderContext.newLine()
         page += self.disclaimerBlock()
         fname =  self.indexPageName()
-        f = open(fname+ self.renderContext.fileExtension(),"w")
+        f = self.renderContext.openFile(fname=fname)
         f.write(page.encode("utf-8"))
-        f.close()
+        self.renderContext.closeFile(f)
         return
 
     def nextPreviousBlock(self,previousItem,nextItem):

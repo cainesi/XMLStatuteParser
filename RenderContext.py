@@ -6,8 +6,9 @@
 
 #TODO: clean up the rendering methods that are provided, some are no longer needed with the current parser
 
-import re
+import re, os
 import urllib
+import Constants
 
 badStrings = [("&#8217;","'"),("&#8220;","\""),("&#8221;","\""),("&#8212;","--")]
 
@@ -84,6 +85,14 @@ class RenderContext:
     @staticmethod
     def fileExtension():
         return ""
+    @staticmethod
+    def openFile(classType,fname):
+        f = open(os.path.join(Constants.PAGEDIR,fname) + classType.fileExtension(),"w")
+        return f
+    @classmethod
+    def closeFile(classType,f):
+        f.close()
+        return
     pass
 
 
@@ -160,7 +169,7 @@ class WikiContext(RenderContext):
     @staticmethod
     def mailTo(address):
         return "[[mailto:%s]]"%address
-    pass
+
 
 class HTMLContext(RenderContext):
     includesBulletins = False #in html, we won't necessarily have bulletins available.
@@ -171,9 +180,9 @@ class HTMLContext(RenderContext):
     @staticmethod
     def cleanPlainText(text):
         """method for cleaning raw text without any formatting."""
-        for badString,replacement in htmlBadStrings:
-            text = re.sub(badString,replacement,text)
-            pass
+        #for badString,replacement in htmlBadStrings:
+        #    text = re.sub(badString,replacement,text)
+        #    pass
         return text 
     @staticmethod
     def documentStart():
@@ -242,4 +251,17 @@ class HTMLContext(RenderContext):
     @staticmethod
     def fileExtension():
         return ".html"
+    @classmethod
+    def openFile(classType, fname):
+        f = open(os.path.join(Constants.PAGEDIR,fname) + classType.fileExtension(),"w")
+        f.write("<html>\n")
+        f.write("<meta charset = \"utf-8\">")
+        return f
+    @classmethod
+    def closeFile(classType,f):
+        f.write("</html>")
+        RenderContext.closeFile(f)
+        return
+
+
     pass
