@@ -96,7 +96,7 @@ class Statute(object):
         #self.definitionData.displayDefinedTerms()
         #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
-        #self.markSectionReferences() #detect section references in text, and decorate them
+        self.markSectionReferences() #detect section references in text, and decorate them
         return
 
     ###
@@ -266,10 +266,6 @@ class Statute(object):
 
     def renderPages(self): #TODO: this code is just a stop-gap for testing purposes
         """Renders a page for each top-level sectionItems."""
-        #TODO - render TOC
-
-        #TODO - render currency page
-
         #render pages
 
         for previousItem,sectionItem,nextItem in util.triples(self.sectionList): self.renderSectionPage(sectionItem,previousItem=previousItem,nextItem=nextItem)
@@ -300,7 +296,7 @@ class Statute(object):
         page += self.renderContext.newLine()
 
         #page contents
-        page += sectionItem.getRenderedText(self.renderContext,skipLabel=True)
+        page += sectionItem.getRenderedText(self.renderContext,skipLabel=True,baseLevel=2) #set base level to 2 so that subsection as flush left
         page += self.renderContext.newLine()
 
         #footer

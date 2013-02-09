@@ -231,6 +231,8 @@ class HTMLContext(RenderContext):
         #text = HTMLContext.cleanPlainText(text)
         return "<font size=\"%.2f\">%s</font>"%(size, text)
     @staticmethod
+    def renderMarginalNote(text):
+        return "<font color=\"green\"><i>%s</i></font>" % text
     def renderTable(table):
         return "<table>\n<tr>" + "</tr>\n<tr>".join(["<td>" + "</td><td>".join(row) + "</td>" for row in table]) + "</tr></table>"
     @staticmethod

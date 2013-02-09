@@ -47,7 +47,7 @@ class BaseItem(StatutePart):
        @rtype: SectionLabelLib.SectionLabel
        """
         return None
-    def getRenderedText(self,renderContext,skipLabel=False):
+    def getRenderedText(self,renderContext,skipLabel=False,baseLevel=0):
         """Get the text for this item, rendered according to the provided context."""
         paragraphs = self.getParagraphs(renderContext,skipLabel=skipLabel)
         #merge paragraphs, where possible
@@ -55,7 +55,7 @@ class BaseItem(StatutePart):
         for p in paragraphs[1:]:
             if not mergedParagraphs[-1].merge(p): mergedParagraphs.append(p)
             pass
-        return "\n".join(p.getRenderedText() for p in mergedParagraphs)
+        return "\n".join(p.getRenderedText(baseLevel=baseLevel) for p in mergedParagraphs)
     def getParagraphs(self, renderContext, skipLabel=False):
         """Get list of paragraph text-blocks for this item, rendered according to the current context.  Gets overridden in certain subclasses to reflect different paragraph breakdown (e.g., in TextItems)"""
         return self.getSubParagraphs(renderContext)
@@ -145,7 +145,8 @@ class SectionItem(BaseItem):
                 if len(subsecs) > 0: showError("Formula term label encountered after other text ["+ self.labelString +"]["+str(subsecs)+"]",location=self)
             elif child.tag == "historicalnote":
                 if self.historicalNote is not None: showError("Multiple historical notes",location=self)
-                self.historicalNote = child.getRawText().strip() #TODO: improve handling of historical notes -- give them their own items that parse the contents and generate paragraphs
+                #TODO: improve handling of historical notes -- give them their own items that parse the contents and generate paragraphs
+                self.historicalNote = child.getSpacedRawText().strip()
             elif child.tag == "repealed":
                 self.repealed = True
                 subsecs.append(child) #don't ignore
@@ -203,7 +204,7 @@ class SectionItem(BaseItem):
             paragraphs.append( Paragraph(text=anchor, renderContext=renderContext, indentLevel=self.getIndentLevel(),forceNewParagraph=True ) )
             if self.getLabelString() is not None: paragraphs.append(Paragraph(text=renderContext.boldText(self.getLabelString()), renderContext=renderContext, indentLevel=self.getIndentLevel(), softSpace=True) )
         paragraphs += self.getSubParagraphs(renderContext)
-        if self.historicalNote is not None: paragraphs.append(Paragraph(text=self.historicalNote,renderContext=renderContext,forceNewParagraph=True,indentLevel=self.getIndentLevel()))
+        if self.historicalNote is not None: paragraphs.append(Paragraph(text=renderContext.newLine() + "HISTORICAL INFORMATION: " + self.historicalNote,renderContext=renderContext,forceNewParagraph=True,indentLevel=self.getIndentLevel()))
 
         if needForce and len(paragraphs) > 0: paragraphs[0].forceNewParagraph = True #force a new paragraphs to start if not already accomplished by label string or marginal note
         return paragraphs
@@ -444,16 +445,20 @@ class TextItem(BaseItem):
         @rtype: DecoratedText.DecoratedText
         """
         return self.decoratedText
-    def getRenderedText(self, renderContext,skipLabel=False):
+    def getRenderedText(self, renderContext,skipLabel=False,baseLevel=0):
         """Calls the getDecoratedText method on the underlying DecoratedText object, with the supplied RenderContext."""
         return self.decoratedText.getRenderedText(renderContext)
-    def getParagraphs(self, renderContext, skipLabel = False):
+
+    def getParagraphs(self, renderContext, skipLabel=False):
         """Return the rendered text of this item bundled into a list of Paragraph objects."""
         indentLevel = self.getIndentLevel()
-        return [Paragraph(text=self.getRenderedText(renderContext),renderContext=renderContext,indentLevel=indentLevel,forceNewParagraph=self.forceNewParagraph)]
+        return [Paragraph(text=self.getRenderedText(renderContext),renderContext=renderContext, indentLevel=indentLevel,
+                          forceNewParagraph=self.forceNewParagraph)]
+
     def getDefinedTerms(self):
         return self.definedTerms
-    def getRawText(self,limit = 500):
+
+    def getRawText(self, limit=500):
         return self.decoratedText.getText()[:limit]
 
 #####
@@ -464,18 +469,19 @@ class TextItem(BaseItem):
 
 class HeadingItem(StatutePart):
     def __init__(self, parent=None, statute=None, tree=None):
-        StatutePart.__init__(self,parent=parent,statute=statute) #Heading items do not have parents, just the statute
+        StatutePart.__init__(self, parent=parent, statute=statute)  #Heading items do not have parents, just the statute
         if tree is None: raise StatuteException("No tree provided to HeadingItem")
         self.tree = tree
         self.titleString = None
-        self.labelString = None #Label assigned to this heading (part/division/etc.)
-        self.numbering = None  #SegmentNumbering for this segment (only non-None if labeled)
+        self.labelString = None  # Label assigned to this heading (part/division/etc.)
+        self.numbering = None  # SegmentNumbering for this segment (only non-None if labeled)
         self.processHeadingData()
         self.confirmLabel()
         return
+
     def processHeadingData(self):
         """Extracts heading information from the tree of the heading node."""
-        subsecs = [] #TODO: factor this out into a method that can be overriden for definitions
+        subsecs = []  # TODO: factor this out into a method that can be overriden for definitions
         for child in self.tree:
             if child.tag == "label":
                 self.labelString = child.getRawText().strip()
@@ -483,15 +489,16 @@ class HeadingItem(StatutePart):
             elif child.tag == "titletext":
                 self.titleString = child.getRawText().strip()
                 pass
-            elif isinstance(child,XMLStatParse.TextNode) and child.getRawText() == "": pass #ignore whitespace textnodes
+            elif isinstance(child, XMLStatParse.TextNode) and child.getRawText() == "": pass  # ignore whitespace textnodes
             else:
                 subsecs.append(child)
                 pass
-        if len(subsecs) > 0: showError("Excess nodes in headingitem: ["+str(subsecs)+"]")
+        if len(subsecs) > 0: showError("Excess nodes in headingitem: [" + str(subsecs) + "]")
         return
 
     def confirmLabel(self):
-        """Confirm that the label seen on the item is consistent with the information in the tree's labels value, and creates a numbering for the heading, if so.  If not, show an error."""
+        """Confirm that the label seen on the item is consistent with the information in the tree's labels value,
+        and creates a numbering for the heading, if so.  If not, show an error."""
         #confirm that we have a valid segmentType and create SegmentNumbering object
         if self.labelString is None: return
         l = self.labelString.split()
@@ -557,6 +564,8 @@ class Paragraph(object):
         self.text += spacer + nextParagraph.text
         self.softSpace = nextParagraph.softSpace
         return True
-    def getRenderedText(self):
+    def getRenderedText(self, baseLevel = 0):
         if self.isMarginalNote: return self.renderContext.renderMarginalNote(self.text)
-        return self.renderContext.indentText(self.text, level = self.indentLevel)
+        indent = self.indentLevel - baseLevel
+        if indent < 0: intent = 0
+        return self.renderContext.indentText(self.text, level = indent)

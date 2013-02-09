@@ -174,7 +174,11 @@ class TextNode(Node):
         if self.original != None: return self.original
         return self.text
     def getPrettyXML(self): return self.getXML()
-    def getRawText(self): return self.text.strip() #strips the leading and trailing spaces on text pieces within the raw text
+    def getRawText(self):
+        """Returns the raw text in the node, except that if the node is nothing but whitespace, returns empty string."""
+        #TODO: maybe should just strip off trailing newlines?
+        if self.text.strip() == u"": return u""
+        return self.text
     def getSpacedRawText(self): return self.getRawText()
     def addChild(self,node): raise XMLStatException("Cannot add children to TextNode.")
     pass
