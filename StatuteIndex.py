@@ -118,15 +118,17 @@ class StatuteData(object):
         self.index = index
         self.name = name
         self.prefix = prefix #file prefix for this statute, if any
-        self.act = act
-        self.reg = reg
-        self.url = url
+        self.act = act  #the "Act" for this statute (e.g., the ITA for the Income Tax regulations)
+        self.reg = reg  #the "Regulations" for this statute (e.g., the Income Tax Regulations for the ITA)
+        self.url = url #the url where the statute can be downloaded from
         self.fileOnly = fileOnly
         self.fullName = None #full name of act for display purposes (if any)
         self.bundle = None #the statute bundle for this statute, is set once loaded
         self.rawName = None #filename where XML content can be located on disk (only useful if fileOnly is set)
         self.noCheck = False #if True, then url will not be check if xml already available locally
         self.indexLoaded = False #Set to True once indexes have been loaded from file, if loading is successful
+
+        #the following three variables contain meta data about the Statute and are regenerated when the Statute object is loaded.
         self.sLDict = None #dictionary indexed by sL objects of sections in this statute
         self.sectionNameDict = None #dictionary indexed by the string labels of sections in this statute, and pointing to SLs
         self.linksDict = None #dictionary of external links -- indexed by external statute name, then by target sL, then a list of source sLs in this Statute.
@@ -231,7 +233,7 @@ class StatuteData(object):
 
     def setSLDict(self,sLDict):
         """Sets the sLDict for this statute."""
-        self.slDict = sLDict
+        self.sLDict = sLDict
         return
     def setSectionNameDict(self,sectionNameDict):
         """Sets the sectionNameDict for this statute."""
@@ -251,7 +253,7 @@ class StatuteData(object):
         return os.path.join(Constants.STATUTEDATADIR, self.name + ".index")
     def storeIndices(self):
         """Causes the index information in the file to be stored to the appropriate file."""
-        f = file(self.getIndexName,"wb"); pickle.dump((self.slDict,self.sectionNameDict,self.linksDict),f); f.close()
+        f = file(self.getIndexName(),"wb"); pickle.dump((self.sLDict,self.sectionNameDict,self.linksDict),f); f.close()
         return
     def loadIndices(self):
         """Loads all the indices for the statute from the disk. If no indices file is found, sets the indices to empty dictionaries, and shows a warning."""
@@ -259,12 +261,12 @@ class StatuteData(object):
             showError("["+self.name+"] Could not find index file for statute")
         else:
             try:
-                f = file(self.getIndexName(),"rb"); self.slDict, self.sectionNameDict, self.linksDict = pickle.load(f); f.close()
+                f = file(self.getIndexName(),"rb"); self.sLDict, self.sectionNameDict, self.linksDict = pickle.load(f); f.close()
             except IOError:
                 showError("["+self.name+"] Error opening index file for statute")
                 pass
             pass
-        if self.slDict is None: showError("["+self.name+"] No slDict, setting to {}"); self.slDict = {}
+        if self.sLDict is None: showError("["+self.name+"] No slDict, setting to {}"); self.sLDict = {}
         if self.sectionNameDict is None: showError("[" + self.name + "] No sectionNameDict, setting to {}"); self.sectionNameDict = {}
         if self.linksDict is None: showError("[" + self.name + "] No linksDict, setting to {}"); self.linksDict = {}
         return

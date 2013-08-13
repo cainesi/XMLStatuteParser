@@ -7,8 +7,11 @@
 # X - Finish code to add decorators for section references
 # X - Code to find defined terms
 # X - figure out what apostrophes are going wrong -- need to specify utf-8 in html files: <meta charset = "utf-8">
-# Fix indenting (should have an option in getRenderedText to reduce the indenting in the block --- more maybe have something in the pretty printer object, once that's arranged.)
-# put marginal notes in output
+# X - Fix indenting (should have an option in getRenderedText to reduce the indenting in the block --- more maybe have something in the pretty printer object, once that's arranged.)
+# X- put marginal notes in output
+# output index files for Statutes (use StatuteData storeIndices() method after the Statute processed.
+# cross-link references to regulations / act
+# fix the error reporting of decorators (so we aren't overwhelmed with definition errors)
 # extract the citation string (e.g., "R.S.C., 1985, c. C-49") from the main page for statute
 # Avoid parsing application ranges in "read as" provisions.
 # Code to find one-off definitions

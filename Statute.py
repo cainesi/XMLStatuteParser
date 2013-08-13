@@ -87,16 +87,18 @@ class Statute(object):
         self.processStatuteContents(self.contentTree) #extract the contents of the statute
 
         return
+
     #TODO, after testing, make the following part of the initialization (we've separated it out so that object can be assigned before this code is run)
     def doProcess(self):
         self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
         self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
+        #TODO: also need to store data for sLDict and linkDict in the statuteData object
         self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
         self.definitionData.applyToAll()
         #self.definitionData.displayDefinedTerms()
-        #TODO: put some form of sectionData into the self.statuteData object
         #TODO: insert decorations for section cross-references
         self.markSectionReferences() #detect section references in text, and decorate them
+        self.statuteData.storeIndices()
         return
 
     ###

@@ -546,12 +546,30 @@ class SectionReferenceParse(TextParse):
         #TODO - extend to non-local references (will need code in StatuteData to redirect to correct data object.
         if len(self.sectionDict)  == 0: return
         statData = self.decoratedText.getStatute().getStatuteData()
-        if "LOCAL" in self.sectionDict:
-            statData.pinpointFragmentList(fragmentList=self.sectionDict["LOCAL"],locationSL=self.decoratedText.getSectionLabel(),errorLocation=self.decoratedText)
-            for frag in self.sectionDict["LOCAL"]:
-                if frag.hasPinpoint(): self.addLinkDecorator(frag)
-#            for frag in self.sectionDict["LOCAL"]: print(frag.getText() + "--" + (str(frag.getPinpoint()) if frag.hasPinpoint() else "NONE" ))
+        for actName in self.sectionDict:
+            if actName == "LOCAL": #add decorators for local references
+                statData.pinpointFragmentList(fragmentList=self.sectionDict["LOCAL"],locationSL=self.decoratedText.getSectionLabel(),errorLocation=self.decoratedText)
+                for frag in self.sectionDict["LOCAL"]:
+                    if frag.hasPinpoint(): self.addLinkDecorator(frag)
+                    #for frag in self.sectionDict["LOCAL"]: print(frag.getText() + "--" + (str(frag.getPinpoint()) if frag.hasPinpoint() else "NONE" ))
+                pass
+            if actName == "Act": #add decorators for "Act" references
+                actStat = statData.getAct()
+                if actStat != None:
+                    actData = self.decoratedText.getStatute().getStatuteIndex().getStatuteData(actStat)
+                    actData.pinpointFragmentList(fragmentList=self.sectionDict["Act"],locationSL=None,errorLocation=self.decoratedText)
+                    for frag in self.sectionDict["Act"]:
+                        if frag.hasPinpoint(): self.addLinkDecorator(frag)
+                else:
+                    showError("\"Act\" is referenced, but not act specified for statute.", location = self.decoratedText)
+            if actName == "Regulations" in self.sectionDict: #add decorators for "Reg" references
+                #TODO: fill this in
+                pass
+            if actName not in ("LOCAL","Act","Regulations"):
+                #TODO: fill this in, cross-references to all other statutes
+                pass
             pass
+
         return
     def showParseData(self):
         for loc in self.sectionDict:
@@ -621,7 +639,12 @@ if __name__ == "__main__":
     t = ApplicationParse(s)
     t.showParseData()
 
-    print("\nTest 9")
+    print("\nTest 10")
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="Notwithstanding any other provision of this Act (other than subsection 18(5.1)), in this subsection and subsections 18(4) to 18(6),")
     t = ApplicationParse(s)
+    t.showParseData()
+
+    print("\nTest 11")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="For the purposes of subsection 13(2), paragraph 13(7)(g), subparagraph 13(7)(h)(iii), subsections 20(4) and (16.1), the description of B in paragraph 67.3(d) and subparagraph 85(1)(e.4)(i) of the Act, the amount prescribed is")
+    t = SectionReferenceParse(s)
     t.showParseData()
