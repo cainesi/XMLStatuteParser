@@ -1,2 +1,3 @@
 34.1 - Lots of odd constructs, incl. multi-section readas provisions
 211.1 - Nested formula
+Regulation 7307(1) -- list section references, all of which are to the Act (need to figure out how to detect situation like this -- maybe a special "For the purposes of" parser in the regulations?)
