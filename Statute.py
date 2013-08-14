@@ -344,17 +344,31 @@ class Statute(object):
         page = u""
         #header
         # - page title
-        page += self.renderContext.renderHeading("Contents" + " " + self.statuteData.getFullName(),1)
+        page += self.renderContext.renderHeading(self.statuteData.getFullName() + " Table of Contents",1)
         page += self.renderContext.newLine()
         page += self.renderContext.horizontalLine()
         page += self.renderContext.newLine()
 
-        for sectionItem in self.sectionList:
-            sL = sectionItem.getSectionLabel()
-            assert isinstance(sL, SectionLabelLib.SectionLabel)
-            pin = self.statuteData.getPinpoint(sL)
-            page += self.renderContext.renderPinpoint(pin, sL.getIDString())
-            page += self.renderContext.newLine()
+        for item in self.allItemList:
+            if isinstance(item,StatuteItem.SectionItem):
+                sectionItem = item
+                sL = sectionItem.getSectionLabel()
+                assert isinstance(sL, SectionLabelLib.SectionLabel)
+                pin = self.statuteData.getPinpoint(sL)
+                title = sectionItem.getTitle()
+                if title != "": title = " (" + title + ")"
+                page += self.renderContext.renderPinpoint(pin, sL.getIDString() + title )
+                page += self.renderContext.newLine()
+                pass
+            elif isinstance(item,StatuteItem.HeadingItem):
+                l = [item.getLabelString(), item.getTitleString()]
+                l = [c for c in l if c is not None]
+                level = 4
+                if item.getNumbering() is not None: level = item.getNumbering().getHeadingLevel()
+                title = " -- ".join(l)
+                page += self.renderContext.renderHeading(title,level)
+                page += self.renderContext.newLine()
+                pass
             pass
         page += self.renderContext.horizontalLine()
         page += self.renderContext.newLine()

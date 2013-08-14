@@ -175,6 +175,14 @@ class SegmentNumbering(object):
     def __ne__(self,dn): return not self == dn
     def __repr__(self): return "<SegmentNumbering:" + self.segmentType + ":" + self.labelString + ">"
     def __str__(self): return self.getString()
+    def getHeadingLevel(self):
+        """Returns an integer giving the appropriate indentation level for this numbering (used mainly in creating table of contents.
+        @rtype: int
+        """
+        if self.getSegmentType() == "part": return 1
+        elif self.getSegmentType() == "division": return 2
+        elif self.getSegmentType() == "subdivision": return 3
+        return 4
     pass
 
 class Segment(object):

@@ -133,6 +133,7 @@ class StatuteData(object):
         self.sectionNameDict = None #dictionary indexed by the string labels of sections in this statute, and pointing to SLs
         self.linksDict = None #dictionary of external links -- indexed by external statute name, then by target sL, then a list of source sLs in this Statute.
         return
+
     def __str__(self): return "<StatuteData: name:["+ str(self.name)+"] url:["+str(self.url)+"]>"
     def getName(self): return self.name
     def setPrefix(self,prefix):
@@ -232,15 +233,15 @@ class StatuteData(object):
     ###
 
     def setSLDict(self,sLDict):
-        """Sets the sLDict for this statute."""
+        """Sets the sLDict for this statute. Each sL mapping to the corresponding start position (for sorting)."""
         self.sLDict = sLDict
         return
     def setSectionNameDict(self,sectionNameDict):
-        """Sets the sectionNameDict for this statute."""
+        """Sets the sectionNameDict for this statute. Each name mapping to the corresponding sL object."""
         self.sectionNameDict = sectionNameDict
         return
     def setLinks(self, linksDict):
-        """Set the linksDict for this Statute."""
+        """Set the linksDict for this Statute. Indexed by Statute name, and then by """
         self.linksDict = linksDict
         return
     def setIndices(self, sLDict=None,sectionNameDict=None,linksDict=None):

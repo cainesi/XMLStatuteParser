@@ -711,3 +711,9 @@ if __name__ == "__main__":
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
     t = TextParse(s)
     print(t.eatActLocation())
+
+    st = "paragraph (i), paragraphs 12(1)(o) and 12(1)(z.5), 18(1)(m), 20(1)(v.1) and 29(1)(b) and 29(2)(b), section 55, subsections 69(6) and 69(7) and paragraph 82(1)(b) of this Act and paragraphs 20(1)(gg) and 81(1)(r) and (s) of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,"
+    print("\nTest 14:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = SectionReferenceParse(s)
+    t.showParseData()

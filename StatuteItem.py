@@ -44,8 +44,8 @@ class BaseItem(StatutePart):
         else: return self.parent.getSectionLabel()
     def getImmediateSectionLabel(self):
         """Returns the section label if this particular item, or None if self is not itself labeled.
-       @rtype: SectionLabelLib.SectionLabel
-       """
+        @rtype: SectionLabelLib.SectionLabel
+        """
         return None
     def getRenderedText(self,renderContext,skipLabel=False,baseLevel=0):
         """Get the text for this item, rendered according to the provided context."""
@@ -107,6 +107,33 @@ class BaseItem(StatutePart):
             pass
         s = "".join(c for c in l)
         return s[:limit]
+    def getMarginalList(self):
+        """Returns a list of the string representation of the marginal notes for the section.
+        @rtype: str
+        """
+        l = []
+        for item in self.itemIterator():
+            if isinstance(item,SectionItem):
+                l.append(item.getMarginalNote())
+                pass
+            pass
+        l = [c for c in l if c is not None]
+        return l
+
+    def getTitle(self,limit=100):
+        """Returns a string summarizing the contents of the section, with maximum length limit.
+        @type limit: int
+        @rtype: str
+        """
+        l = self.getMarginalList()
+        if len(l) == 0: return ""
+        s = " / ".join(l)
+        if len(s) > limit:
+            #TODO: force break at the final space in the title
+            s = s[:limit]
+            s = s + "..."
+            pass
+        return s
 
 class SectionItem(BaseItem):
     """Class for a section / subsection / etc."""
@@ -526,6 +553,9 @@ class HeadingItem(StatutePart):
 
     def getTitleString(self):
         return self.titleString
+
+    def getLabelString(self):
+        return self.labelString
 
     def getLocationString(self):
         #TODO: Provide a string based on the heading information
