@@ -211,7 +211,7 @@ class StatuteData(object):
             showError("Statute loaded from url.", header="LOADING")
             readNew = True
             pass
-        elif not self.noCheck: #we have the bundle locally, only check url if updateCheck is set
+        elif not self.noCheck and not self.fileOnly: #we have the bundle locally, only check url if updateCheck is set
             showError("File present, checking for update ["+self.name+"].",header="LOADING")
             newData = StatuteFetch.readStatutePage(self.getUrl())
             if StatuteFetch.isStatDictUpdated(bundle,newData): showError("Update found, loading from url ["+self.name+"].",header="LOADING"); bundle = StatuteFetch.fetchStatute(self.getUrl()); readNew = True

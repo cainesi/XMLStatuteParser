@@ -80,15 +80,17 @@ class Fragment(object):
 
 class LabelLocation(object):
     """Class for encapsulating information about where a label points to (locally within the current act, another act, regulations, within a definition."""
-    def __init__(self,local=False, actName=None,definition=None,definitionSectionFragment=None):
+    def __init__(self,local=False, actName=None,definition=None,definitionSectionFragment=None,silent=False):
         """
         Object can be initialized in three ways: by specifying that reference is local, by giving the name of Act pointed to, or by giving the definition that is being referred to
         @type local: bool
+        @type silent: bool
         @type actName: str
         @type definition: str
         @type definitionSectionFragment: Fragment
         """
         self.local=False
+        self.silent= silent #if self.silent = True, indicates that the location was not explicitly stated, so is assumed local
         self.actName = None
         self.definition=None
         self.definitionSectionFragment=None
@@ -106,6 +108,8 @@ class LabelLocation(object):
     def isDefinitionRef(self):
         if self.definition is not None: return True
         return False
+    def isSilent(self):
+        return self.silent
     def isLocal(self): return self.local
     def isActRef(self):
         if self.actName is not None: return True
@@ -128,22 +132,46 @@ class TextParse(object):
         self.matches = {} #dictionary of stored matches of the various types
         self.ptrStack = []
         self.eatSpace() #there should never be leading space on the text
+        self.stateCount=0 #counts the number of states that have been saved
         return
     def __len__(self):
         return len(self.text)
 
     def saveState(self):
-        """Save the state of the pointer, so we can restore to this point if desired."""
-        self.ptrStack.append(self.ptr)
-        return
-    def restoreState(self):
+        """Save the state of the pointer, so we can restore to this point if desired. """
+        level = len(self.ptrStack)
+        ptr = self.ptr
+        self.stateCount += 1
+        number = self.stateCount
+        state = (ptr,number,level)
+        self.ptrStack.append(state)
+        return state
+    def restoreState(self,state=None):
         """Restore the ptr state to what it was at the corresponding previous save."""
-        self.ptr = self.ptrStack.pop()
+        if state is None:
+            self.ptr = self.ptrStack.pop()[0]
+            return
+        ptr, number, level = state
+        if level > len(self.ptrStack):
+            raise LangUtilException("Attempt to restore state that no longer exists.")
+        if self.ptrStack[level][1] != number:
+            raise LangUtilException("Attempt to restore state that has been replaced.")
+        self.ptr = self.ptrStack[level][0]
+        self.ptrStack = self.ptrStack[:level]
         return
-    def discardState(self):
-        """Discard the top saved state (so a subsequent restore we restore to the one before)."""
-        self.ptrStack.pop()
+    def discardState(self,state=None):
+        """Discard the top saved state, or the specified state and any sub-states (so a subsequent restore we restore to the one before)."""
+        if state is None:
+            self.ptrStack.pop()
+            return
+        ptr, number, level = state
+        if level > len(self.ptrStack):
+            raise LangUtilException("Attempt to restore state that no longer exists.")
+        if self.ptrStack[level][1] != number:
+            raise LangUtilException("Attempt to restore state that has been replaced.")
+        self.ptrStack = self.ptrStack[:level]
         return
+
     def recordMatch(self,matchType,item):
         """Record the item for of a given matchType.  Program needs to remember what is stored for each matchType (locaction, match object, etc)"""
         if matchType not in self.matches: self.matches[matchType] = []
@@ -300,11 +328,12 @@ class TextParse(object):
         self.saveState()
         #check for word "of", if not present there's nothing
         nextWord = self.eatWord()
-        if nextWord != "of": self.restoreState(); return LabelLocation(local=True)
+        if nextWord != "of": self.restoreState(); return LabelLocation(local=True, silent=True)
         nextWord = self.eatWord()
         if nextWord == "this":
             nextWord = self.eatWord()
             if nextWord == "Act": self.discardState(); return LabelLocation(local=True)
+            elif nextWord in ("section","subsection","paragraph","subparagraph"): self.discardState(); return LabelLocation(local=True)
             else: showError("Unknown \"of\" type: this " + nextWord, location = self.decoratedText); self.restoreState(); return LabelLocation(local=True)
         elif nextWord == "that":
             nextWord = self.eatWord()
@@ -345,9 +374,9 @@ class TextParse(object):
         self.restoreState()
         return LabelLocation(local=True)
 
-    def eatLabelSeries(self):
+    def eatSingleLabelSeries(self):
         """This is one of the key methods of the parser.  Eats a series of labels (e.g., "section 4, 2 and 7 [of the Fiseries Act]") and returns a tuple (location, list of fragments).  The location is "LOCAL" if the location is the local statute. The returns values are both None if there is no match.
-        @rtype: str, list of Fragment
+        @rtype: LabelLocation, list of Fragment
         """
         labelList = []
         self.saveState()
@@ -363,6 +392,28 @@ class TextParse(object):
         location = self.eatActLocation()
         if len(labelList) > 0: labelList[0].setSeriesStart()
         return location, labelList
+
+    def eatLabelSeries(self):
+        """This method eats a string of label series, joined by connectors, until it finds no more series, or until it finds a series with a non-soft-local location. Both return values are None if there is no match.
+        @rtype: LabelLocation, list of Fragment
+        """
+        newLoc, newList = self.eatSingleLabelSeries()
+        if newLoc is None: return None, None
+        labelList = newList
+        lastLoc = newLoc
+        while newLoc is not None and newLoc.isLocal() and newLoc.isSilent(): #keep reading series until we either cannot find a series, or we find a series with a specified location
+            lastLoc = newLoc
+            self.saveState()
+            cstr = self.eatConnector()  #check for and read connector
+            if cstr is None: self.restoreState(); break
+            newLoc,newList = self.eatSingleLabelSeries() #check for and read new list
+            if newLoc is None: self.restoreState(); break
+            labelList += newList
+            self.discardState()
+            pass
+        if newLoc is None: location = lastLoc
+        else: location = newLoc
+        return location,labelList
 
     def eatNextLabelSeries(self):
         """Eats to the start of a labelSeries, and then eats and returns the series.  If no valid label series found, advances point to end of string and returns None, None."""
@@ -648,3 +699,15 @@ if __name__ == "__main__":
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text="For the purposes of subsection 13(2), paragraph 13(7)(g), subparagraph 13(7)(h)(iii), subsections 20(4) and (16.1), the description of B in paragraph 67.3(d) and subparagraph 85(1)(e.4)(i) of the Act, the amount prescribed is")
     t = SectionReferenceParse(s)
     t.showParseData()
+
+    st = "contract, other than a contract described in paragraph (1)(d) of this section, or paragraph 12.2(3)(e) of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952, or to which"
+    print("\nTest 12:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = SectionReferenceParse(s)
+    t.showParseData()
+
+    st = "of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952, or to which"
+    print("\nTest 13:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = TextParse(s)
+    print(t.eatActLocation())

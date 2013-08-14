@@ -11,10 +11,12 @@
 Name: "ITA"
 Url: "http://laws-lois.justice.gc.ca/eng/acts/I-3.3/"
 Reg: "IT Reg"
+Fileonly: ""
 
 Name: "IT Reg"
 Url: "http://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._945/"
 Act: "ITA"
+Fileonly: ""
 
 Name: "apca"
 Url: "http://laws-lois.justice.gc.ca/eng/acts/C-49/index.html"
