@@ -129,9 +129,10 @@ class StatuteData(object):
         self.indexLoaded = False #Set to True once indexes have been loaded from file, if loading is successful
 
         #the following three variables contain meta data about the Statute and are regenerated when the Statute object is loaded.
-        self.sLDict = None #dictionary indexed by sL objects of sections in this statute
+        #TODO: other metadata to store: (1) names of sections, (2) more information about sectoin ordering?
+        self.sLDict = None #dictionary indexed by sL objects giving the ordinal position of the sL in the Statute (allows ordering)
         self.sectionNameDict = None #dictionary indexed by the string labels of sections in this statute, and pointing to SLs
-        self.linksDict = None #dictionary of external links -- indexed by external statute name, then by target sL, then a list of source sLs in this Statute.
+        self.linkDict = None #dictionary of external links -- indexed by external statute name, then by target sL, then a list of source sLs in this Statute.
         return
 
     def __str__(self): return "<StatuteData: name:["+ str(self.name)+"] url:["+str(self.url)+"]>"
@@ -152,7 +153,9 @@ class StatuteData(object):
         if self.act is not None: raise StatuteIndexException("Setting act when act already specified ["+str(self)+"]["+self.act+"]["+actName+"]")
         self.act = actName
         return
-    def getAct(self): return self.act
+    def getAct(self):
+        """Returns the "Act" Statute for this instrument."""
+        return self.act
     def setReg(self, regName):
         if self.reg is not None: raise StatuteIndexException("Setting reg when act already specified ["+str(self)+"]["+self.reg+"]["+regName+"]")
         self.reg = regName
@@ -240,9 +243,9 @@ class StatuteData(object):
         """Sets the sectionNameDict for this statute. Each name mapping to the corresponding sL object."""
         self.sectionNameDict = sectionNameDict
         return
-    def setLinks(self, linksDict):
+    def setLinkDict(self, linkDict):
         """Set the linksDict for this Statute. Indexed by Statute name, and then by """
-        self.linksDict = linksDict
+        self.linkDict = linkDict
         return
     def setIndices(self, sLDict=None,sectionNameDict=None,linksDict=None):
         """Set all the indices for statute at once, and store to file."""
@@ -254,7 +257,9 @@ class StatuteData(object):
         return os.path.join(Constants.STATUTEDATADIR, self.name + ".index")
     def storeIndices(self):
         """Causes the index information in the file to be stored to the appropriate file."""
-        f = file(self.getIndexName(),"wb"); pickle.dump((self.sLDict,self.sectionNameDict,self.linksDict),f); f.close()
+        f = file(self.getIndexName(),"wb")
+        pickle.dump((self.sLDict,self.sectionNameDict,self.linkDict),f)
+        f.close()
         return
     def loadIndices(self):
         """Loads all the indices for the statute from the disk. If no indices file is found, sets the indices to empty dictionaries, and shows a warning."""
@@ -262,15 +267,43 @@ class StatuteData(object):
             showError("["+self.name+"] Could not find index file for statute")
         else:
             try:
-                f = file(self.getIndexName(),"rb"); self.sLDict, self.sectionNameDict, self.linksDict = pickle.load(f); f.close()
+                f = file(self.getIndexName(),"rb")
+                self.sLDict, self.sectionNameDict, self.linkDict = pickle.load(f)
+                f.close()
             except IOError:
                 showError("["+self.name+"] Error opening index file for statute")
                 pass
             pass
         if self.sLDict is None: showError("["+self.name+"] No slDict, setting to {}"); self.sLDict = {}
         if self.sectionNameDict is None: showError("[" + self.name + "] No sectionNameDict, setting to {}"); self.sectionNameDict = {}
-        if self.linksDict is None: showError("[" + self.name + "] No linksDict, setting to {}"); self.linksDict = {}
+        if self.linkDict is None: showError("[" + self.name + "] No linksDict, setting to {}"); self.linkDict = {}
         return
+
+    def getLinksToSL(self,targetSL, statuteName=None,errorLocation=None):
+        """Returns a list of sL's from this statute that link to the specified sL in statuteName (if statuteName is None, then returns local links).
+        @type targetSL: SectionLabelLib.SectionLabel
+        @type statuteName: str
+        @rtype: list of SectionLabelLib.SectionLabel
+        """
+        if self.sectionNameDict is None: showError("Call to getLinksToSL before self.sectionNameDict is set. Loading indices.",location=errorLocation); self.loadIndices()
+
+        if statuteName is None: statuteName = self.getName()
+
+        if statuteName in self.linkDict:
+            sLDict = self.linkDict[statuteName]
+        else: return []
+        if targetSL in sLDict:
+            ll = sLDict[targetSL]
+        else: return []
+        return ll
+
+
+    ###
+    #
+    # Code for getting sL or Pinpoint representing a section label from text
+    #
+    ###
+
     def getSLFromString(self,sLString,locationSL=None,errorLocation=None):
         """Returns the SL (if any) represented by the string in the Statute.  If locationSL is specified, and the sLString is not found in the label dictionary, then additional searches are made pre-pending portions of locationSL.
         @rtype: SectionLabelLib.SectionLabel

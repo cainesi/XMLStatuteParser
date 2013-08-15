@@ -90,14 +90,18 @@ class Statute(object):
 
     #TODO, after testing, make the following part of the initialization (we've separated it out so that object can be assigned before this code is run)
     def doProcess(self):
-        self.sectionData = SectionLabelLib.SectionData(statute=self) #compile information about the ordering of sections
-        self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())
+        self.sectionData = SectionLabelLib.SectionData(statute=self)                #compile information about the ordering of sections
+        self.statuteData.setSectionNameDict(self.sectionData.getSectionNameDict())  #store information about available sections
         #TODO: also need to store data for sLDict and linkDict in the statuteData object
         self.definitionData = DefinitionData(statute=self) #compile information about available definitions and their ranges of applicability
         self.definitionData.applyToAll()
         #self.definitionData.displayDefinedTerms()
         #TODO: insert decorations for section cross-references
         self.markSectionReferences() #detect section references in text, and decorate them
+
+        #create cross-link dictionary
+        linkDict = self.compileLinkDict()
+        self.statuteData.setLinks(linkDict)
         self.statuteData.storeIndices()
         return
 
@@ -241,6 +245,45 @@ class Statute(object):
         self.allItemList.append(section)
         self.segmentData.addSection(section.getSectionLabel())
         return
+
+    def compileLinkDict(self):
+        """Compile a dictionary specifying all the links from this Statute.
+        Dictionary is indexed by statute name,
+        """
+        #create master list of source/target for every link in the Statute
+        linkList = []
+        for section in self.sectionList:
+            for subItem in section:
+                if isinstance(subItem,StatuteItem.TextItem):
+                    sourceSL = subItem.getSectionLabel()
+                    dt = subItem.getDecoratedText()
+                    pinpoints = dt.getPinpoints()
+                    for pin in pinpoints: linkList.append((sourceSL,pin))
+                    pass
+                pass
+            pass
+        #produce linkDict from the list of links
+        linkDict = {}
+        for sourceSL,pin in linkList: #produce the linkDict
+            targetStatuteName = pin.getStatuteName()
+            targetSL = pin.getSL()
+            sourceSL = sourceSL[:1]
+            if len(sourceSL) != 1: continue
+            targetSL = targetSL[:1]
+            if len(targetSL) != 1: continue
+            if targetStatuteName not in linkDict: linkDict[targetStatuteName] = {}
+            if targetSL not in linkDict[targetStatuteName]: linkDict[targetStatuteName][targetSL] = {}
+            linkDict[targetStatuteName][targetSL][sourceSL] = None
+        for targetStatuteName in linkDict: #replace the final dict
+            for targetSL in linkDict[targetStatuteName]:
+                d = linkDict[targetStatuteName][targetSL]
+                l = d.keys()
+                l.sort(key=lambda x:self.sectionData.sectionStart[x])
+                linkDict[targetStatuteName][targetSL] = l
+                pass
+            pass
+
+        return linkDict
 
     ###
     #

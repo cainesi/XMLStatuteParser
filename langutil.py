@@ -333,6 +333,7 @@ class TextParse(object):
         if nextWord == "this":
             nextWord = self.eatWord()
             if nextWord == "Act": self.discardState(); return LabelLocation(local=True)
+            #TODO: what is used in place of "this Act" in the regulations?
             elif nextWord in ("section","subsection","paragraph","subparagraph"): self.discardState(); return LabelLocation(local=True)
             else: showError("Unknown \"of\" type: this " + nextWord, location = self.decoratedText); self.restoreState(); return LabelLocation(local=True)
         elif nextWord == "that":

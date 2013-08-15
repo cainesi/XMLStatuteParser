@@ -518,6 +518,7 @@ class Pinpoint(object):
         self.sL = sL
         self.page = page
         self.anchor = anchor
+        #TODO: The elements are all filled in consistently by the StatuteData object -- maybe this object should be defined in StatuteIndex?
         return
     def getStatuteName(self): return self.statuteName
     def getSL(self): return self.sL

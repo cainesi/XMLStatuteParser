@@ -47,7 +47,6 @@ class DecoratedText(StatutePart):
         @type decorator: Decorator
         @rtype: str"""
         return self.text[decorator.getStart():decorator.getEnd()]
-
     def getRenderedText(self, renderContext):
         """Returns the items text, with the Decorator objects applied to the applicable portions."""
         self.decorators.sort()
@@ -70,7 +69,18 @@ class DecoratedText(StatutePart):
             if isinstance(dec,DefinedTermDecorator): terms.append(dec.getDefinedTerm())
             pass
         return terms
-
+    def getPinpoints(self):
+        """Returns a list of pinpoints for links originating from this decorated text.
+        @rtype: list of SectionLabelLib.Pinpoint
+        """
+        l = []
+        for dec in self.decorators:
+            if isinstance(dec,DefinedTermDecorator) or isinstance(dec,LinkDecorator):
+                t = dec.getPinpoint()
+                if t is not None: l.append(l)
+                pass
+            pass
+        return l
 
 class Decorator(StatutePart):
     def __init__(self, parent, start, end):
@@ -133,8 +143,8 @@ class LinkDecorator(Decorator):
         """Object representing a link to a pinpoint location.
         @type start: int
         @type end: int
-        @type pinpoint: SectionLabelList.Pinpoint
-        @return:
+        @type pinpoint: SectionLabelLib.Pinpoint
+        @rtype: None
         """
         Decorator.__init__(self,parent,start,end)
         self.pinpoint = pinpoint
@@ -143,6 +153,11 @@ class LinkDecorator(Decorator):
         text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull) #text to be decorated
         if self.pinpoint is None: return text #return plain text, unless we have a target #TODO, maybe we should mark the text as a failed decorator?
         return renderContext.renderPinpoint(pinpoint=self.pinpoint,text=text)
+    def getPinpoint(self):
+        """Returns the pinpoint object specifying where this link goes.
+        @rtype: SectionLabelLib.PinPoint
+        """
+        return self.pinpoint
 
 class DefinedTermDecorator(Decorator):
     def __init__(self, parent,start,end,definedTerm,pinpoint=None):
@@ -170,4 +185,8 @@ class DefinedTermDecorator(Decorator):
         text = Decorator.getRenderedText(self,renderContext,textPiece=textPiece,textFull=textFull) #get the simple text
         if self.pinpoint is None: return renderContext.boldText(text)
         return renderContext.renderPinpoint(pinpoint=self.pinpoint,text=text)
-
+    def getPinpoint(self):
+        """Returns the pinpoint object specifying where this link goes.
+        @rtype: SectionLabelLib.PinPoint
+        """
+        return self.pinpoint

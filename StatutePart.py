@@ -8,6 +8,7 @@ class StatutePart(object):
     """Superclass for everything that is part of the Statute object.  These objects keep track of their parent and the statute that they are a part of."""
     def __init__(self, parent, statute = None):
         """parent is the object sitting above this object in the structure.  statute is the Statute object of which this object is a part."""
+        #TODO: confirm what the type of parent should be
         self.parent = parent
         if statute != None: self.statute = statute
         else:
