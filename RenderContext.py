@@ -106,7 +106,7 @@ class WikiContext(RenderContext):
     @staticmethod
     def cleanPlainText(text):
         """method for cleaning raw text without any formatting."""
-        return text   
+        return text
     @staticmethod
     def indentText(text, level = 0):
         return ">" * level + " " + text
@@ -165,10 +165,169 @@ class WikiContext(RenderContext):
         return "//" + text + "//"
     @staticmethod
     def boldText(text):
-        return "**" + text + "**"  
+        return "**" + text + "**"
     @staticmethod
     def mailTo(address):
         return "[[mailto:%s]]"%address
+
+
+class MediaWikiContext(RenderContext):
+    @staticmethod
+    def cleanText(text):
+        for badString,replacement in badStrings:
+            text = re.sub(badString,replacement,text)
+            pass
+        return text
+    @staticmethod
+    def cleanPlainText(text):
+        """method for cleaning raw text without any formatting."""
+        return text
+    def _cleanLink(linkText):
+         """removes quote and pipe characters from text, so that they can serve as valid mediawiki anchors.  This is needed both for the code creating anchors, and the code to make links to anchors."""
+         return linkText.replace("\"","&quot;").replace("|","&#124;").replace("=","&#61;").replace("#","&#36;") #may need to replace other things, e.g., curly braces
+    @staticmethod
+    def indentText(text, level = 0):
+        return ":" * level + " " + text
+    @staticmethod
+    def renderPinpoint(pinpoint, text=None):
+        if text is None: linkText = pinpoint.getText()
+        else: linkText = text
+        targetString = pinpoint.getPage() + "#" + pinpoint.getAnchor()
+        return "[[" + targetString+ "|" +linkText + "]]"
+    @staticmethod
+    def renderPageLink(pageName,text=None):
+        if text is None: linkText = pageName
+        else: linkText = text
+        return "[[" + pageName + "|" + linkText + "]]"
+    @staticmethod
+    def renderLink(targetSection,targetAnchor=None,linkText=None):
+        """renders a link in the current context. targetSection is the section to link to, targetAnchor is the anchor in the section, linkText is the text of the link."""
+        targetString = targetSection
+        if targetAnchor is not None: targetString += "#" + MediaWikiContext._cleanLink(targetAnchor)
+        if linkText is None:
+            linkText = targetString
+            pass
+        linkText = MediaWikiContext.cleanText(linkText)
+        return "[[%s|%s]]"%(targetString,linkText)
+    @staticmethod
+    def renderExternalLink(targetURL,linkText=None):
+        """renders a link to a url pointing outside of the wiki."""
+        if linkText == None: linkText = targetURL
+        return "[[%s|%s]]" % (targetURL, linkText)
+    @staticmethod
+    def renderAnchor(anchorTarget):
+        return "<div id=\"%s\"/>" & MediaWikiContext._cleanLink(anchorTarget)
+    @staticmethod
+    def renderHeading(text,level):
+        text = MediaWikiContext.cleanText(text)
+        return "="*level + " " + text + " " + "="*level
+    @staticmethod
+    def renderMarginalNote(text):
+        return MediaWikiContext.renderHeading(text,5)
+    @staticmethod
+    def renderTable(table):
+        if len(table) == 0: return ""
+        heading = "! " + " !! ".join(table[0])
+        if len(table) == 1: return "{|\n" + heading + "\n" + "|}"
+        content = "|-\n" + "\n|-\n".join(["| " + " || ".join(row) for row in table[1:]])
+        return "{|\n" + heading + "\n" + content + "\n" + "|}"
+    @staticmethod
+    def renderTOC():
+        """code for a table of contents, if available."""
+        return "{{TOC | align = right}}"
+    @staticmethod
+    def horizontalLine():
+        return "----"
+    @staticmethod
+    def newLine():
+        return "\n"
+    @staticmethod
+    def italicText(text):
+        return "''" + text + "''"
+    @staticmethod
+    def boldText(text):
+        return "'''" + text + "'''"
+    @staticmethod
+    def mailTo(address):
+        return "[mailto:%s]"%address
+
+
+# class MediaWikiContext(RenderContext):
+#     """Renderer used for mediawiki pages (second wiki)."""
+#     badStrings = [] #[("&#8217;","'"),("&#8220;","\""),("&#8221;","\""),("&#8212;","--")] #media wiki does not have the same problems with escape characters appearing in headings and links
+#
+#     @staticmethod
+#     def cleanText(text):
+#         return text
+#         #for badString,replacement in MediaWikiContext.badStrings:
+#         #    text = re.sub(badString,replacement,text)
+#         #    pass
+#         #return text
+#     @staticmethod
+#     def cleanPlainText(text):
+#         """method for cleaning raw text without any formatting."""
+#         return text
+#     @staticmethod
+#     def renderPlainText(text, level = 0):
+#         return (":" * level) + text
+#     @staticmethod
+#     def _cleanLink(linkText):
+#         """removes quote and pipe characters from text, so that they can serve as valid mediawiki anchors.  This is needed both for the code creating anchors, and the code to make links to anchors."""
+#         return linkText.replace("\"","&quot;").replace("|","&#124;").replace("=","&#61;").replace("#","&#36;") #may need to replace other things, e.g., curly braces
+#     @staticmethod
+#     def renderLink(targetSection,targetAnchor=None,linkText=None):
+#         """renders a link in the current context. targetSection is the section (i.e., wiki-page) to link to, targetAnchor is the anchor in the section, linkText is the text of the link, if different."""
+#         targetString = MediaWikiContext._cleanLink(targetSection)
+#         if targetAnchor is not None: targetString += "#" + MediaWikiContext._cleanLink(targetAnchor)
+#         if linkText is None: linkText = targetString
+#         #linkText = WikiContext.cleanText(linkText) #not needed in mediawiki
+#         return "[[%s|%s]]"%(targetString,linkText)
+#     @staticmethod
+#     def renderExternalLink(targetURL,linkText=None):
+#         """renders a link to a url pointing outside of the wiki."""
+#         if linkText == None: linkText = targetUrl
+#         return "[%s %s]" % (targetURL, linkText)
+#     @staticmethod
+#     def mailTo(address):
+#         return "[mailto:%s]"%address
+#     @staticmethod
+#     def renderAnchor(anchorTarget):
+#         return "{{anchor|%s}}" % MediaWikiContext._cleanLink(anchorTarget)
+#     @staticmethod
+#     def renderHeading(text,level):
+#         #text = MediaWikiContext.cleanText(text) #not needed in mediawiki
+#         return "="*level + text + "="*level
+#     @staticmethod
+#     def renderTable(table):
+#         if len(table) == 0: return ""
+#         heading = "! " + " !! ".join(table[0])
+#         if len(table) == 1: return "{|\n" + heading + "\n" + "|}"
+#         content = "|-\n" + "\n|-\n".join(["| " + " || ".join(row) for row in table[1:]])
+#         return "{|\n" + heading + "\n" + content + "\n" + "|}"
+#     @staticmethod
+#     def renderTOC():
+#         """code for a table of contents, if available."""
+#         return "{{TOC | align = right}}"
+#     @staticmethod
+#     def horizontalLine():
+#         return "----"
+#     @staticmethod
+#     def newLine():
+#         return "\n\n"
+#     @staticmethod
+#     def italicText(text):
+#         return "''" + text + "''"
+#     @staticmethod
+#     def boldText(text):
+#         return "'''" + text + "'''"
+#     @staticmethod
+#     def comment(text):
+#         if "-->" in text:
+#             raise RenderException("Comment contains \"-->\" (%s)"%text )
+#         return "<!-- " + text + " -->"
+#     pass
+
+
 
 
 class HTMLContext(RenderContext):
