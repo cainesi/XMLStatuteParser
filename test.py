@@ -6,8 +6,10 @@ import Constants
 
 
 #statList = ["apca"]
-statList=["ITA"]
+#statList=["ITA"]
 #statList=["IT Reg"]
+statList=["ITA", "IT Reg"]
+
 si = StatuteIndex.StatuteIndex()
 
 

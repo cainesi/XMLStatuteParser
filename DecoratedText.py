@@ -77,7 +77,7 @@ class DecoratedText(StatutePart):
         for dec in self.decorators:
             if isinstance(dec,DefinedTermDecorator) or isinstance(dec,LinkDecorator):
                 t = dec.getPinpoint()
-                if t is not None: l.append(l)
+                if t is not None: l.append(t)
                 pass
             pass
         return l

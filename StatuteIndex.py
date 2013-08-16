@@ -70,7 +70,8 @@ class StatuteIndex(object):
             pass
         return
     def addStatuteData(self, statuteData):
-        """Adds a StatuteData object to the index.  Throws exception if we already have a Statute with the specified name."""
+        """Adds a StatuteData object to the index.  Throws exception if we already have a Statute with the specified name.
+        """
         name = statuteData.getName()
         if name in self.statuteDataDict: raise StatuteIndexException("Duplicated StatuteData name: " + name)
         self.statuteDataDict[name] = statuteData
@@ -80,7 +81,8 @@ class StatuteIndex(object):
     def getStatuteData(self,name):
         """Returns the StatuteData object for the named statute.
         @type name: str
-        @rtype: StatuteData"""
+        @rtype: StatuteData
+        """
         return self.statuteDataDict[name]
     def getStatute(self,name):
         """Returns the Statute object representing the parsed statute.
@@ -93,11 +95,7 @@ class StatuteIndex(object):
         @rtype: StatuteData
         """
         return self.getStatuteData(name)
-    def getLinksToSection(self,name,sL):
-        """Returns a list of all sections, from any source, linking to a specified sL (or sub-sL of that sL) the named statute."""
-        linkList = []
-        #TODO - write this
-        return linkList
+
     pass
 
 
@@ -117,7 +115,7 @@ class StatuteData(object):
         #following contain metadata about the section contents of the statute and should be updated each time the statute is parsed.
         self.index = index
         self.name = name
-        self.prefix = prefix #file prefix for this statute, if any
+        self.prefix = prefix #file prefix for this statute, if any -- if this is None, defaults to self.name
         self.act = act  #the "Act" for this statute (e.g., the ITA for the Income Tax regulations)
         self.reg = reg  #the "Regulations" for this statute (e.g., the Income Tax Regulations for the ITA)
         self.url = url #the url where the statute can be downloaded from

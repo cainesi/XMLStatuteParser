@@ -55,10 +55,14 @@ class Statute(object):
         segmentData - contain information about the segments (parts / divisions / subdivisions) in the statute and which sections correspond to which segments.
         sectionData - contains information about the sections in the Statute, their text-searchable representations and their orderings.
         instrumentType - gives the type of instrument represented by the object -- currently just "statute" and "regulation"
+        @type statuteName: str
+        @type statuteIndex: StatuteIndex.StatuteIndex
+        @type verbose: bool
+        @rtype: None
         """
         self.statuteName = statuteName
         self.statuteIndex = statuteIndex
-        self.statuteData = self.statuteIndex[self.statuteName]
+        self.statuteData = self.statuteIndex.getStatuteData(self.statuteName)
         self.renderContext = RenderContext.HTMLContext
 
         data = self.statuteData.getRawXML()
@@ -101,7 +105,7 @@ class Statute(object):
 
         #create cross-link dictionary
         linkDict = self.compileLinkDict()
-        self.statuteData.setLinks(linkDict)
+        self.statuteData.setLinkDict(linkDict)
         self.statuteData.storeIndices()
         return
 
@@ -235,12 +239,19 @@ class Statute(object):
         self.addHeading(hitem)
         return
     def addHeading(self,heading):
-        """Add headingItem to the appropriate lists of the Statute meta-data (the all-heading and all-item lists)."""
+        """Add headingItem to the appropriate lists of the Statute meta-data (the all-heading and all-item lists).
+        @type heading: StatuteItem.HeadingItem
+        @rtype: None
+        """
         self.headingList.append(heading)
         self.allItemList.append(heading)
         if heading.isLabeled(): self.segmentData.addNewNumbering(heading.getNumbering(), title=heading.getTitleString())
         return
     def addSection(self,section):
+        """Add a SectionItem to the appropriate sections.
+        @type section: StatuteItem.SectionItem
+        @rtype: None
+        """
         self.sectionList.append(section)
         self.allItemList.append(section)
         self.segmentData.addSection(section.getSectionLabel())
@@ -253,7 +264,7 @@ class Statute(object):
         #create master list of source/target for every link in the Statute
         linkList = []
         for section in self.sectionList:
-            for subItem in section:
+            for subItem in section.itemIterator():
                 if isinstance(subItem,StatuteItem.TextItem):
                     sourceSL = subItem.getSectionLabel()
                     dt = subItem.getDecoratedText()
@@ -262,6 +273,7 @@ class Statute(object):
                     pass
                 pass
             pass
+
         #produce linkDict from the list of links
         linkDict = {}
         for sourceSL,pin in linkList: #produce the linkDict
@@ -326,7 +338,7 @@ class Statute(object):
         @type nextItem: StatuteItem.SectionItem
         """
         lab = sectionItem.getSectionLabel()[0].getIDString()
-
+        sL = sectionItem.getSectionLabel()
         page = u""
 
         #header
@@ -346,6 +358,12 @@ class Statute(object):
 
         #footer
         # - citing sections (what objects we take references from should be configurable)
+        citeBlock = self.citationsBlock(sectionItem)
+        if citeBlock is not None:
+            page += self.renderContext.horizontalLine()
+            page += self.renderContext.newLine()
+            page += citeBlock
+            page += self.renderContext.newLine()
 
         # - citing bulletins
 
@@ -450,6 +468,54 @@ class Statute(object):
             text += nextStr
             pass
         return text
+    def citationsBlock(self, sectionItem):
+        """Returns the block of text representing citations to this section.
+        @type sectionItem: StatuteItem.SectionItem
+        @rtype: str
+        """
+
+        page = u""
+        #local citations
+        localBlock = self.statuteCiteBlock(sourceStatuteName=self.getStatuteData().getName(),sectionItem=sectionItem)
+        if localBlock is not None:
+            page += self.renderContext.renderHeading("Other sections citing this section:",2)
+            page += self.renderContext.newLine()
+            page += localBlock
+            page += self.renderContext.newLine()
+            pass
+        if self.statuteData.getReg() is not None:
+            regBlock = self.statuteCiteBlock(sourceStatuteName=self.getStatuteData().getReg(),sectionItem=sectionItem)
+            if regBlock is not None:
+                if page != u"":
+                    page += self.renderContext.renderHeading("Sections of regulations citing this section:",2)
+                    page += self.renderContext.newLine()
+                    page += regBlock
+                    page += self.renderContext.newLine()
+                    pass
+                pass
+            pass
+
+        if page == u"": return None
+        return page
+
+    def statuteCiteBlock(self,sourceStatuteName,sectionItem):
+        """Renders the block of links representing links from sourceStatuteName to the specified local section of this statute..  Returns None if there are no such links.
+        @type sourceStatuteName: str
+        @type sectionItem: StatuteItem.sectionItem
+        @rtype: unicode
+        """
+        text = u""
+        l = []
+        targetSL = sectionItem.getSectionLabel() #get sL representing the target
+        sLList = self.statuteIndex.getStatuteData(sourceStatuteName).getLinksToSL(targetSL=targetSL,statuteName=self.statuteData.getName()) #get the list of sL's in the source Statute
+        sourceData = self.statuteIndex.getStatuteData(sourceStatuteName)
+        for sL in sLList:
+            tpin = sourceData.getPinpoint(sL)
+            l.append(self.renderContext.renderPinpoint(tpin))
+            pass
+        if len(l) == 0: return None
+        return ", ".join(l)
+
 
     def disclaimerBlock(self):
         #TODO: fill in email address
