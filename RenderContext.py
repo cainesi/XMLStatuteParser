@@ -85,7 +85,7 @@ class RenderContext:
     @staticmethod
     def fileExtension():
         return ""
-    @staticmethod
+    @classmethod
     def openFile(classType,fname):
         f = open(os.path.join(Constants.PAGEDIR,fname) + classType.fileExtension(),"w")
         return f
