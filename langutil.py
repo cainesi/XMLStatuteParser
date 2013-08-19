@@ -97,7 +97,7 @@ class LabelLocation(object):
         if local == True: self.local = True
         elif actName is not None: self.actName = actName
         else:
-            if (definition is None) or (definitionSectionFragment is None): raise LangUtilException("LabelLocation must specify one of local, actName or definition/definitionSection.")
+            if (definition is None) : raise LangUtilException("LabelLocation must specify one of local, actName or definition (in which case definitionSectionFragment is optional).")
             self.definition=definition; self.definitionSectionFragment=definitionSectionFragment
             pass
         return
@@ -289,18 +289,26 @@ class TextParse(object):
         """Eat text of the form ["defined term" in subsection 248(1)].
         @rtype: LabelLocation
         """
+        #eat defined term
         self.saveState()
         m = quotePat.match(self.ltext,self.ptr)
         if m is None: self.restoreState(); return None
         defTerm = m.group("phrase")
         self.ptr = m.end()
+        self.discardState() #can discard state, because we will definitely use the quotes passage
+
+        #eat section reference, if any
+        self.saveState()
         nextWord = self.eatWord()
-        if nextWord != "in": self.restoreState(); return None
+        if nextWord != "in": self.restoreState(); return LabelLocation(definition=defTerm,definitionSectionFragment=None)
         t = self.eatLabelType()
-        if t is None: self.restoreState(); return None
+        if t is None: self.restoreState(); return LabelLocation(definition=defTerm, definitionSectionFragment=None)
         labString = self.eatLabel()
-        if labString is None: self.restoreState(); return None
+        if labString is None: self.restoreState(); return LabelLocation(definition=defTerm,definitionSectionFragment=None)
+        self.discardState()
         return LabelLocation(definition=defTerm, definitionSectionFragment=labString)
+
+
     rscPat = re.compile(", chapter (?P<chapter>\d+) of the Revised Statutes of Canada, (?P<year>\d+)")
     def eatChapterAndYear(self):
         """Eats the text of a reference to a chapter of the RSC, as in ", chapter 148 of the Revised Statutes of Canada, 1952"
@@ -358,7 +366,7 @@ class TextParse(object):
         elif nextWord == "Regulations": self.discardState(); return LabelLocation(actName="Regulations")
         while nextWord is not None:
             actWords.append(nextWord)
-            if nextWord == "Act":
+            if nextWord == "Act" or nextWord == "Regulations":
                 actStr = " ".join(actWords)
                 chapStr = self.eatChapterAndYear()
                 if chapStr is not None: actStr += chapStr
@@ -595,7 +603,7 @@ class SectionReferenceParse(TextParse):
         return
     def addDecorators(self):
         """Add decorators to the underlying DecoratedText for the labels identified by the parser."""
-        #TODO - extend to non-local references (will need code in StatuteData to redirect to correct data object.
+        #TODO - extend to non-local references (will need code in StatuteData to redirect to correct data object).  - So far implemented for references to the "Act" from regulations
         if len(self.sectionDict)  == 0: return
         statData = self.decoratedText.getStatute().getStatuteData()
         for actName in self.sectionDict:

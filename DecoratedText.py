@@ -23,18 +23,23 @@ class DecoratedText(StatutePart):
     def addDecorator(self,decorator):
         """Adds a decorator for this Text."""
         n = 0
+        #attach decorator to this text
+
+        #find the first decorator that this one starts after / find the point were this decorator would be inserted
         decorator.attachToDecoratedText(self)
-        #find the first decorator that this one starts after
-        insertPoint = len(self.decorators) #find the point were this decorator would be inserted
+        insertPoint = len(self.decorators)
         for n in xrange(0,len(self.decorators)):
             if self.decorators[n].getEnd() > decorator.getStart(): insertPoint = n; break
+            pass
+
         if insertPoint < len(self.decorators) and self.decorators[insertPoint].collide(decorator): #if inserting at the point of existing decorator, and there is an overlap, show error and return
-            #special case when we are adding decorator that nearly exactly overlaps with an existing DefinedTermDecorator that doesn't have a pinpoint.
-            tookPin = self.decorators[insertPoint].takePinpoint(decorator)
-            if tookPin: pass;# showError("Pinpoint inherited to:[" + self.getDText(self.decorators[insertPoint]) + "]", location=self)
+
+            tookPin = self.decorators[insertPoint].takePinpoint(decorator) #special case when we are adding decorator that nearly exactly overlaps with an existing DefinedTermDecorator that doesn't have a pinpoint -- takePinpoint will push decorator's pinpoint down to the existing decorator and return True if successful, in which case can return
+            if tookPin: pass;
             else:
                 oldDec = self.decorators[insertPoint]
-                if abs(decorator.getStart()-oldDec.getStart())< 2 and oldDec.getEnd() > decorator.getEnd(): pass
+                #if abs(decorator.getStart()-oldDec.getStart())< 2 and oldDec.getEnd() > decorator.getEnd(): pass #ignore collisions if new decorator is a subset of old.
+                if decorator.getStart()>=oldDec.getStart() and oldDec.getEnd() >= decorator.getEnd(): pass #ignore collisions if new decorator is a subset of old.
                 else: showError( "Decorator collision, old:[" + self.getDText(self.decorators[insertPoint]) + "], new:[" + self.getDText(decorator) +"]" ,location=self)
             return
         self.decorators.insert(insertPoint,decorator) #insert decorator at appropriate sport

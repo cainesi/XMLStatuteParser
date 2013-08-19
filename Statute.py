@@ -64,7 +64,7 @@ class Statute(object):
         self.statuteIndex = statuteIndex
         self.statuteData = self.statuteIndex.getStatuteData(self.statuteName)
         self.renderContext = RenderContext.HTMLContext
-
+        #self.renderContext = RenderContext.MediaWikiContext
         data = self.statuteData.getRawXML()
 
         p = XMLStatParse.XMLStatuteParser()
@@ -591,7 +591,7 @@ class DefinitionData(object):
         @type decoratedText: DecoratedText.DecoratedText
         @rtype: None
         """
-        text = decoratedText.getText().lower()
+        text = decoratedText.getText().lower() #use normalized (lower-case) text for defined term matching
         sL = decoratedText.getSectionLabel()
         position = self.sectionData.getSLPosition(sL)
         hits = self.applyToText(text=text,position=position)
@@ -614,6 +614,10 @@ class DefinitionData(object):
                 if not appRange.containsPosition(position): continue #if definition not applicable, continue
                 ptr = text.find(term)
                 while ptr != -1: #otherwise, iterate through all instances
+                    #confirm that match occurs at the
+                    if not isAWordRange(text,ptr,ptr+len(term)): #if not a valid word range, simply continue
+                        ptr = text.find(term,ptr+1)
+                        continue
                     sL = source.getSectionLabel()
                     l.append( (ptr, ptr+len(term), self.statuteData.getPinpoint(sL)) )
                     ptr = text.find(term,ptr+1)
@@ -634,9 +638,23 @@ class DefinitionData(object):
 
     pass
 
+###
+#
+# Definition data utility methods
+#
+###
 
+def isAWordRange(text,start,end):
+    """
+    Returns true of the text between start and end corresponds to a series of words in the text, possibly with a pluralization at the end.
+    @type text: str
+    @type start: int
+    @type end: int
+    @rtype: bool
+    """
+    if start != 0 and not text[start-1].isspace(): return False #reject if not space before interval
+    if end == len(text): return True #return True if at end, followed by space, or by "s" and space.
+    if end < len(text) and (not text[end].isalpha()): return True
+    if (end+1) < len(text) and text[end] == "s" and (not text[end+1].isalpha()): return True
+    return False #otherwise, return False
 
-def processAct(url):
-    """Method to grab the statute found at a specific url and automatically process it into wiki pages.  Ultimately it should automatically include any regulations"""
-    #TODO - complete this code
-    return

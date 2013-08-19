@@ -11,28 +11,33 @@
 # X - put marginal notes in output
 # X - output index files for Statutes (use StatuteData storeIndices() method after the Statute processed.
 # X - fix the langutil code so that it correctly applies "Act" locations to everything in a series of references (if some things in a series are referenced to a specific Act and others are not, then the standard practice seems to be to refer to "this Act" for the local references)
+# X - Code in StatuteIndex to convert series of Fragments into references (if references can be found).
+# X - Code to add decorators for other section references
+# X - Code to add tables of referencing sections / regulations (have the decorators store the target sectionLabel/instrument as well as the page/anchor, so that we can walk the decorators and find cross-refernces; or have the StatuteIndex keep track of the cross-links as they are querried?).
 
-# (in progress) cross-link references to regulations / act
+# X - cross-link references to regulations / act
+# X - Code to add disclaimer footer on each page
+# X - Code for tables of contents for each instrument
+
+# include a way for "Income Tax Regulations" location to be recognized as a citations to regulations from the act, and allow list of cross-references from Act
+# (ongoing) fix various the error reporting of decorators (so we aren't overwhelmed with definition errors)
+# (force definition matches to be a word bountries (possibly with pluralization)
+# handle additional "of" types: Criminal Code, Canada Pension Plan, Income Tax Regulations -- need a systematic method for these...
+
 # store sectionStart/End data in the StatuteData object?
-
-# fix the error reporting of decorators (so we aren't overwhelmed with definition errors)
 # extract the citation string (e.g., "R.S.C., 1985, c. C-49") from the main page for statute
 # Avoid parsing application ranges in "read as" provisions.
 # Code to find one-off definitions
-# Add code to StatuteData object to direct location cites to the correct other statuteData.
-# Add code to stat_config.txt to determine which statutes are parsed or ignored
-# Code in StatuteIndex to convert series of Fragments into references (if references can be found).
-# Code to add decorators for other section references
+# Add code to StatuteData object to direct location cites to the correct other statuteData (??? - what was this supposed to do?)
+# Add code to stat_config.txt to determine which statutes are parsed or ignored, and what rendering context to use
 # Code to add decorators for defined terms
 # Confirm that page output working correctly
 # Code to allow one Decorator to override overlapping decorators when added (for example, if the existing decorator doesn't have a pinpoint object)
 # have historical notes handled as a subclass of TextItems rather than as a field of SectionItems, or at least represent them as a DecoratedText object so that they can be marked-up with cross refernces to the implementing/amending legislation.
-# fix up paragraphs where the defined term isn't detected correctly.
-# move SectionData, DefinitionData, StatuteData, StatuteIndex, etc., into StatuteMetaData module
+# fix up paragraphs where the defined term isn't detected correctly. (examples?)
+# rationalize class locations -- move SectionData, DefinitionData, StatuteData, StatuteIndex, etc., into StatuteMetaData module; place
 
-# Code for tables of contents for each instrument
-# Code to add disclaimer footer on each page
 # Code to add decorators for historical notes (should be able to lift this from prior project)
-# Code to add tables of referencing sections / regulations (have the decorators store the target sectionLabel/instrument as well as the page/anchor, so that we can walk the decorators and find cross-refernces; or have the StatuteIndex keep track of the cross-links as they are querried?).
 # Still some problems with handling around italics.  Maybe we should change the getRawText method?
-#PrettyPrint class to replace RenderContext (which will offer more intelligent global formatting)
+# PrettyPrint class to replace RenderContext (which will offer more intelligent global formatting)
+# Python3 conversion

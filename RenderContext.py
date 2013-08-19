@@ -182,6 +182,7 @@ class MediaWikiContext(RenderContext):
     def cleanPlainText(text):
         """method for cleaning raw text without any formatting."""
         return text
+    @staticmethod
     def _cleanLink(linkText):
          """removes quote and pipe characters from text, so that they can serve as valid mediawiki anchors.  This is needed both for the code creating anchors, and the code to make links to anchors."""
          return linkText.replace("\"","&quot;").replace("|","&#124;").replace("=","&#61;").replace("#","&#36;") #may need to replace other things, e.g., curly braces
@@ -216,7 +217,7 @@ class MediaWikiContext(RenderContext):
         return "[[%s|%s]]" % (targetURL, linkText)
     @staticmethod
     def renderAnchor(anchorTarget):
-        return "<div id=\"%s\"/>" & MediaWikiContext._cleanLink(anchorTarget)
+        return "<div id=\"%s\"/>" % MediaWikiContext._cleanLink(anchorTarget)
     @staticmethod
     def renderHeading(text,level):
         text = MediaWikiContext.cleanText(text)
