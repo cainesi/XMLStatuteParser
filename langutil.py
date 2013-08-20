@@ -137,6 +137,14 @@ class TextParse(object):
     def __len__(self):
         return len(self.text)
 
+    def getDecoratedText(self):
+        """
+        Returns the DecoratedText that this parser is working on.
+        @return:
+        @rtype: DecoratedText.DecoratedText
+        """
+        return self.decoratedText
+
     def saveState(self):
         """Save the state of the pointer, so we can restore to this point if desired. """
         level = len(self.ptrStack)
@@ -260,6 +268,18 @@ class TextParse(object):
         self.ptr += namem.end()
         self.eatSpace()
         return namem.group("type")
+
+    def n_eatLabelType(self):
+        """Eats the string describing a type of label (section, subsection, etc). [new version]
+        @rtype: Fragment
+        """
+        namem = sectionNamePat.match(self.ltext[self.ptr:])
+        if namem is None: return None
+        oldPtr = self.ptr
+        self.ptr += namem.end()
+        self.eatSpace()
+        return Fragment(text=namem.group("type"),position=oldPtr)
+
     def eatLabel(self):
         """Eats and returns one label (e.g., "12(6)(a)")
         @rtype: Fragment
@@ -271,6 +291,7 @@ class TextParse(object):
         self.ptr += labm.end()
         self.eatSpace()
         return frag
+
     def eatConnectorAndLabel(self):
         """Eats a connector and a label, if possible, returns the Fragment object for the label.
         @rtype: Fragment
@@ -285,6 +306,30 @@ class TextParse(object):
         self.eatSpace()
         if con == "to": frag.setToConnected(True)
         return frag
+    def eatQuoteText(self):
+        """Eats passage of text surrounded by quotes.
+        @rtype: Fragment
+        """
+        m = quotePat.match(self.ltext,self.ptr)
+        if m is None: return None #if not a quote passage, return None
+        self.ptr = m.end() #otherwise advance ptr and return the quoted passage
+        self.eatSpace()
+        return Fragment(text=m.group("phrase"),position=m.start("phrase"))
+    def eatVariableList(self):
+        """Eats a sequence of variables, and returns list of corresponding Fragments.
+        @rtype: list of Fragment
+        """
+        vlist = []
+        self.saveState()
+        #TODO
+        #variable list header
+
+        #actual list of variables
+
+        print("variable list eater to be implemented.")
+        self.discardState()
+        return vlist
+
     def eatDefinitionAndSection(self):
         """Eat text of the form ["defined term" in subsection 248(1)].
         @rtype: LabelLocation
@@ -383,6 +428,75 @@ class TextParse(object):
         self.restoreState()
         return LabelLocation(local=True)
 
+    def n_eatActLocation(self):
+        """
+        Attempts to eat a description of the location that the sections are drawn from, such as from the list below:
+            of this Act
+            of that Act
+            of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952
+            of the Excise Tax Act
+            of the Foreign Publishers Advertising Services Act
+            of the Bank Act
+        If one can be found, it is returned without the leading "of" (and the leading "the", if present), otherwise returns None (i.e., "local" --- "this Act" also causes this to be the return).  Detection of the name is highly heurisical.
+        @rtype: Fragment
+        """
+        #TODO - return a more sophisticated representation of the statute
+
+        self.saveState()
+        #check for word "of", if not present there's nothing
+        #nextWord = self.eatWord()
+        #if nextWord != "of": self.restoreState(); return None
+        nextWord = self.eatWord()
+        if nextWord == "this":
+            nextWord = self.eatWord()
+            if nextWord == "Act": self.discardState(); return "LOCAL"
+            elif nextWord in ("section","subsection","paragraph","subparagraph"): self.discardState(); return None
+            else:
+                #showError("Unknown \"of\" type: this " + nextWord, location = self.decoratedText)
+                self.restoreState(); return None
+        elif nextWord == "that":
+            nextWord = self.eatWord()
+            if nextWord == "Act": self.discardState(); return LabelLocation(actName="that Act")
+            else:
+                #showError("Unknown \"of\" type: that " + nextWord, location = self.decoratedText)
+                self.restoreState(); return None
+        elif nextWord != "the":
+            #showError("Unknown \"of\" type: " + nextWord, location = self.decoratedText)
+            self.restoreState(); return None
+            pass
+        #At this point, we have found the text "of the"
+
+        nextWord = self.eatWord()
+        #handle the case of definition reference
+        if nextWord == "definition":
+            self.discardState(); return None
+            pass
+
+        actWords = []
+        #special cases for references to the "Act" or the "Regulations"
+        if nextWord == "Act": self.discardState(); return LabelLocation(actName="Act")
+        elif nextWord == "Regulations": self.discardState(); return LabelLocation(actName="Regulations")
+        while nextWord is not None:
+            actWords.append(nextWord)
+            if nextWord == "Act" or nextWord == "Regulations":
+                actStr = " ".join(actWords)
+                chapStr = self.eatChapterAndYear()
+                if chapStr is not None: actStr += chapStr
+                self.discardState()
+                return actStr
+            nextWord = self.eatWord()
+            pass
+
+        #TODO: add code to handle "Income Tax Application Rules" (and maybe other names ending in "Rules"?)
+        #TODO: add code to handle the Canada Pension Plan (maybe made a dictionary of all federal public statute names so we can test them at each step?
+        #TODO: add code to handle references to "Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952"
+        #TODO: references of the "paragraphs (f) and (h) of the description of B in that definition"
+        #TODO: paragraphs (a) to (d), (f) and (g) of the definition "qualified investment" in section 204
+        #showError("Unknown \"of\" type: no closing \"Act\": " + str(actWords), location = self.decoratedText)
+        self.restoreState()
+        return None
+
+
     def eatSingleLabelSeries(self):
         """This is one of the key methods of the parser.  Eats a series of labels (e.g., "section 4, 2 and 7 [of the Fiseries Act]") and returns a tuple (location, list of fragments).  The location is "LOCAL" if the location is the local statute. The returns values are both None if there is no match.
         @rtype: LabelLocation, list of Fragment
@@ -401,6 +515,25 @@ class TextParse(object):
         location = self.eatActLocation()
         if len(labelList) > 0: labelList[0].setSeriesStart()
         return location, labelList
+
+    def n_eatSingleLabelSeries(self):
+        """This is one of the key methods of the parser.  Eats a series of labels (e.g., "section 4, 2 and 7 [of the Fiseries Act]") and returns a tuple (location, list of fragments).  The location is "LOCAL" if the location is the local statute. The returns values are both None if there is no match.
+        @rtype: Fragment, list of Fragment
+        """
+        labelList = []
+        self.saveState()
+        labelType = self.n_eatLabelType()
+        if labelType is None: self.restoreState(); return None, None
+        frag = self.eatLabel()
+        if frag is None: self.restoreState(); return None, None
+        self.discardState()
+        while frag is not None:
+            labelList.append(frag)
+            frag = self.eatConnectorAndLabel()
+            pass
+        if len(labelList) > 0: labelList[0].setSeriesStart()
+        return labelType, labelList
+
 
     def eatLabelSeries(self):
         """This method eats a string of label series, joined by connectors, until it finds no more series, or until it finds a series with a non-soft-local location. Both return values are None if there is no match.
@@ -582,62 +715,204 @@ class Passage(object):
         """
         self.decoratedText=decoratedText
         self.targetStatute = None
+        self.containerPassage = None
         return
 
-    def getTargetStatute(self):
+    @staticmethod
+    def makeContainerPassage(tparse):
+        """Returns the follower object in the tparse at the current state, or None if None.
+        @rtype: Passage
+        """
+        return None
+
+    def parseContainer(self,tparse):
+        """Find container for this Passage in the tparse, and add it, eating the applicable text.  If no Container found, then nothing added."""
+        container = Passage.makeContainerPassage(tparse)
+        if container is None: return
+        self.setContainerPassage = container
+
+
+    def getContainerPassage(self):
+        """
+        @rtype: Passage
+        """
+        return self.containerPassage
+
+    def setContainerPassage(self,passage):
+        """
+        Set the container Passage for this Passage.
+        @param passage:
+        @type passage: Passgae
+        @return:
+        @rtype: None
+        """
+        self.containerPassage = passage
         return
+
+    def setStatuteName(self,statuteName):
+        """
+        Sets the name of the Statute for this passage (useful for Passages that do not have a directly containing Statute Passage -- e.g. where Statute is implicitly local.
+        @param statuteName:
+        @type statuteName: str
+        @return:
+        @rtype: None
+        """
+        #TODO
+        return
+
+    def getStatutePassage(self):
+        """Returns the StatutePassage specifying the Act which this Passage points into, or None if None is specified (i.e., this is a local reference)
+        @rtype: StatutePassage
+        """
+        if self.containerPassage is None:
+            return None
+        return self.containerPassage.getStatutePassage()
+
+    def getLocationSL(self):
+        """Returns the SectionLabel that this Passage points into (e.g., when we are talking about a paragraph of a definition)
+        @rtype SectionLabelLib.SectionLabel
+        """
+        return None
+
+
+    def __str__(self):
+        return "<" + self.passageString() + self.getContainerPassage().passageString() + ">"
+
+    def passageString(self):
+        return "[Generic Passage]"
+
     pass
 
-class LabelPassage(Reference):
+class LabelPassage(Passage):
     """Class representing a match to a subsection type and a list of labels in text."""
     @staticmethod
-    def getLabelPassage(tparse):
+    def makeLabelPassage(tparse):
         """Returns the LabelPassage at the current position in tparse, otherwise None. Label passge is one referring to a collection of section labels of some type, e.g., section 1, 2 and 3
         @type tparse: TextParse
         @rtype: LabelPassage
         """
+        tparse.saveState()
+        ltype, llist = tparse.n_eatSingleLabelSeries()
+        if ltype is None:
+            tparse.restoreState()
+            return None
+        tparse.discardState()
+        assert(isinstance(ltype, Fragment))
+        assert(isinstance(llist,list))
+        lp = LabelPassage(decoratedText=tparse.getDecoratedText(),labelType=ltype,labelList=llist)
+        lp.parseContainer(tparse) #parse and add container, if one is present
+        return lp
+
+    def __init__(self,decoratedText, labelType, labelList):
+        """
+        @type decoratedText: DecoratedText.DecoratedText
+        @type labelType: Fragment
+        @type labelList: list of Fragment
+        """
+        Passage.__init__(self,decoratedText)
+        self.labelType = labelType
+        self.labelList = labelList
         return
 
-    def __init__(self):
-        Passage.__init__(self)
-        return
+    def passageString(self):
+        return "[Label:" + self.labelType.getText() + ":" + ", ".join(c.getText() for c in self.labelList) + "]"
     pass
 
-class ActPassage(Reference):
+class StatutePassage(Passage):
     @staticmethod
-    def getActPassage(tparse):
+    def makeStatutePassage(tparse):
         """
-        Returns ActPassage at at the current position in tparse, otherwise None. ActPassage is one referring to an Act (e.g., the Blah Blah Act(, revised statutes of Canada...)
+        Returns StatutePassage at at the current position in tparse, otherwise None. StatutePassage is one referring to an Statute (e.g., the Blah Blah Act(, revised statutes of Canada...)
         @type tparse: TextParse
-        @rtype: ActPassage
+        @rtype: StatutePassage
         """
+        actName = tparse.n_eatActLocation()
+        if actName is None:
+            return None
+        return StatutePassage(decoratedText=tparse.getDecoratedText(),statuteName=actName)
 
-        return None
-    def __init__(self):
-        Reference()
+    def __init__(self,decoratedText,statuteName):
+        """
+        @type decoratedText: DecoratedText.DecoratedText
+        @type statuteName: str
+        """
+        Passage.__init__(self,decoratedText)
+
+        self.statuteName = statuteName
+        self.statuteFragment=None
         return
-    pass
 
-class DefinitionPassage(Reference):
+    def getStatutePassage(self):
+        return self
+
+    def passageString(self):
+        return "[Statute: " + self.statuteName + "]"
+
+class DefinitionPassage(Passage):
     @staticmethod
-    def getDefinitionPassage(tparse):
+    def makeDefinitionPassage(tparse):
         """
         Returns DefinitionPassage at the current position in tparse, otherwise None.  DefinitionPassage is one referring to the defintion of a defined term (e.g. the definition "blah blah"...)
         @type tparse: TextParse
         @rtype: DefinitionPassage
         """
-        return None
-    def __init__(self):
-        return
+        tparse.saveState()
+        w= tparse.eatWord()
+        if w.lower() != "the":
+            tparse.restoreState()
+            return None
+        w = tparse.eatWord()
+        if w.lower() != "definition":
+            tparse.restoreState()
+            return None
+        qfrag = tparse.eatQuoteText()
+        if qfrag is None:
+            tparse.restoreState()
+            return None
+        df = DefinitionPassage(decoratedText=tparse.getDecoratedText(), definitionFrag=qfrag)
+        df.parseContainer(tparse)
+        return df
+    def __init__(self,decoratedText,definitionFrag):
+        """
+        @type decoratedText: DecoratedText.DecoratedText
+        @param definitionFrag:
+        @type definitionFrag: Fragment
+        """
+        Passage.__init__(self,decoratedText)
 
-class DescriptionPassage(Reference):
+        self.definitionFragment = definitionFrag
+        self.definedTerm = self.definitionFragment.getText().lower()
+        return
+    def passageString(self):
+        return "[Defintion: \"" + self.definedTerm + "\"]"
+
+class DescriptionPassage(Passage):
     @staticmethod
-    def getDescriptionPassage(tparse):
+    def makeDescriptionPassage(tparse):
         """
         Returns DescriptionPassage at the current position in tparse, otherwise None. DescriptionPassage is a passage referring to one or more variables in a formula (e.g., (the description of|the value of|determined for) A (and|or|to) (G) in (section|subsection etc) or (the definition "...")...
         @type tparse: TextParse
         @rtype: DescriptionPassage
         """
+
+        vlist = tparse.eatVariableList()
+        if vlist is None: return None
+
+        dp = DescriptionPassage(decoratedText=tparse.getDecoratedText(),varFragList=vlist)
+        dp.parseContainer(tparse)
+        return dp
+    def __init__(self,decoratedText,varFragList):
+        """
+        @type decoratedText: DecoratedText.DecoratedText
+        @type varFragList: list of Fragment
+        """
+        Passage.__init__(self,decoratedText,varFragList)
+        self.variableFragments = varFragList
+        self.variables = [c.getText() for c in self.variableFragments]
+        return
+    def passageString(self):
+        return "[Variables: " + ", ".join(self.variables) + "]"
+
 
 class SectionReferenceParse(TextParse):
     """Finds all the local/external section references in text."""
