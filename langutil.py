@@ -80,17 +80,17 @@ class Fragment(object):
 
 class LabelLocation(object):
     """Class for encapsulating information about where a label points to (locally within the current act, another act, regulations, within a definition."""
-    def __init__(self,local=False, actName=None,definition=None,definitionSectionFragment=None,silent=False):
+    def __init__(self,local=False, actName=None,definition=None,definitionSectionFragment=None,softLocal=False):
         """
         Object can be initialized in three ways: by specifying that reference is local, by giving the name of Act pointed to, or by giving the definition that is being referred to
         @type local: bool
-        @type silent: bool
+        @type softLocal: bool
         @type actName: str
         @type definition: str
         @type definitionSectionFragment: Fragment
         """
         self.local=False
-        self.silent= silent #if self.silent = True, indicates that the location was not explicitly stated, so is assumed local
+        self.silent= softLocal #if self.silent = True, indicates that the location was not explicitly stated, so is assumed local
         self.actName = None
         self.definition=None
         self.definitionSectionFragment=None
@@ -336,7 +336,7 @@ class TextParse(object):
         self.saveState()
         #check for word "of", if not present there's nothing
         nextWord = self.eatWord()
-        if nextWord != "of": self.restoreState(); return LabelLocation(local=True, silent=True)
+        if nextWord != "of": self.restoreState(); return LabelLocation(local=True, softLocal=True)
         nextWord = self.eatWord()
         if nextWord == "this":
             nextWord = self.eatWord()
@@ -570,6 +570,74 @@ class ApplicationParse(TextParse):
         #if the nextSLList is not empty we clear it out producing one more interval
         if len(nextSLList) > 0: nextInterval = SectionLabelLib.SectionLabelInterval(sectionData=sdata, sLList=nextSLList); intervalList.append(nextInterval)
         return SectionLabelLib.SectionLabelCollection(sectionData=sdata,intervalList=intervalList)
+
+
+#TODO: need a function that advances us to the start of the next Passage point (starting section, subsection, etc... the value, the description, the definition, others?)
+
+class Passage(object):
+    """Super class for objects representing a match to some form of cross-reference in the text of the Statute."""
+    def __init__(self,decoratedText):
+        """
+        @type decoratedText: DecoratedText.DecoratedText
+        """
+        self.decoratedText=decoratedText
+        self.targetStatute = None
+        return
+
+    def getTargetStatute(self):
+        return
+    pass
+
+class LabelPassage(Reference):
+    """Class representing a match to a subsection type and a list of labels in text."""
+    @staticmethod
+    def getLabelPassage(tparse):
+        """Returns the LabelPassage at the current position in tparse, otherwise None. Label passge is one referring to a collection of section labels of some type, e.g., section 1, 2 and 3
+        @type tparse: TextParse
+        @rtype: LabelPassage
+        """
+        return
+
+    def __init__(self):
+        Passage.__init__(self)
+        return
+    pass
+
+class ActPassage(Reference):
+    @staticmethod
+    def getActPassage(tparse):
+        """
+        Returns ActPassage at at the current position in tparse, otherwise None. ActPassage is one referring to an Act (e.g., the Blah Blah Act(, revised statutes of Canada...)
+        @type tparse: TextParse
+        @rtype: ActPassage
+        """
+
+        return None
+    def __init__(self):
+        Reference()
+        return
+    pass
+
+class DefinitionPassage(Reference):
+    @staticmethod
+    def getDefinitionPassage(tparse):
+        """
+        Returns DefinitionPassage at the current position in tparse, otherwise None.  DefinitionPassage is one referring to the defintion of a defined term (e.g. the definition "blah blah"...)
+        @type tparse: TextParse
+        @rtype: DefinitionPassage
+        """
+        return None
+    def __init__(self):
+        return
+
+class DescriptionPassage(Reference):
+    @staticmethod
+    def getDescriptionPassage(tparse):
+        """
+        Returns DescriptionPassage at the current position in tparse, otherwise None. DescriptionPassage is a passage referring to one or more variables in a formula (e.g., (the description of|the value of|determined for) A (and|or|to) (G) in (section|subsection etc) or (the definition "...")...
+        @type tparse: TextParse
+        @rtype: DescriptionPassage
+        """
 
 class SectionReferenceParse(TextParse):
     """Finds all the local/external section references in text."""
