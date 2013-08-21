@@ -15,6 +15,8 @@ import DecoratedText
 
 class LangUtilException(Exception): pass
 
+#TODO: make it consistent whether the eating methods should eat initial space or leave no initial space on the string
+
 labelPat = re.compile("(" + "(\d+([a-zA-Z])?(\.\d+)?)(\([^\) ]{1,10}\))*" + "|" + "(\([^\) ]{1,10}\))+" + ")")
 connectorPat = re.compile("(?P<connector>to|and( in)?|or|,)")
 sectionNamePat = re.compile("(?P<type>section|subsection|paragraph|clause|subclause)s?")
@@ -315,20 +317,53 @@ class TextParse(object):
         self.ptr = m.end() #otherwise advance ptr and return the quoted passage
         self.eatSpace()
         return Fragment(text=m.group("phrase"),position=m.start("phrase"))
+
+    variableHeaderPat = re.compile(" *(the descriptions? of|the values? of|determined for)")
+    variablePat = re.compile(" *(?P<variable>[A-Z](\.\d+)?)")
+    def eatVariable(self):
+        """
+        @rtype: Fragment
+        """
+        m = TextParse.variablePat.match(self.text[self.ptr:])
+        if m is None:
+            return None
+        varFrag = Fragment(text=m.group("variable"),position=self.ptr)
+        self.ptr += m.end()
+        self.eatSpace()
+        return varFrag
     def eatVariableList(self):
         """Eats a sequence of variables, and returns list of corresponding Fragments.
         @rtype: list of Fragment
         """
+
+        self.saveState() #first block eats header for list of variables and initial variable
+        m = TextParse.variableHeaderPat.match(self.ltext[self.ptr:])
+        if m is None:
+            self.restoreState()
+            return None
+        self.ptr = m.end()
+        self.eatSpace()
         vlist = []
-        self.saveState()
-        #TODO
-        #variable list header
-
-        #actual list of variables
-
-        print("variable list eater to be implemented.")
+        variable = self.eatVariable()
+        if variable is None:
+            self.restoreState()
+            return None
+        vlist.append(variable)
         self.discardState()
+
+        self.saveState() #second block eats any additional variables
+        con = self.eatConnector()
+        variable = self.eatVariable()
+        while (con is not None) and (variable is not None):
+            vlist.append(variable)
+            self.discardState()
+            self.saveState()
+            con = self.eatConnector()
+            variable = self.eatVariable()
+            pass
+        self.restoreState() #restore state to before the last attempt to eat connector and variable (which failed)
         return vlist
+
 
     def eatDefinitionAndSection(self):
         """Eat text of the form ["defined term" in subsection 248(1)].
@@ -450,7 +485,7 @@ class TextParse(object):
         if nextWord == "this":
             nextWord = self.eatWord()
             if nextWord == "Act": self.discardState(); return "LOCAL"
-            elif nextWord in ("section","subsection","paragraph","subparagraph"): self.discardState(); return None
+            elif nextWord in ("section","subsection","paragraph","subparagraph"): self.restoreState(); return None
             else:
                 #showError("Unknown \"of\" type: this " + nextWord, location = self.decoratedText)
                 self.restoreState(); return None
@@ -469,7 +504,7 @@ class TextParse(object):
         nextWord = self.eatWord()
         #handle the case of definition reference
         if nextWord == "definition":
-            self.discardState(); return None
+            self.restoreState(); return None
             pass
 
         actWords = []
@@ -720,17 +755,43 @@ class Passage(object):
 
     @staticmethod
     def makeContainerPassage(tparse):
-        """Returns the follower object in the tparse at the current state, or None if None.
+        """Returns the follower object in the tparse at the current state, or None if None.  May return a passage of type LabelPassage, DefinitionPassage, DescriptionPassage or StatutePassage
         @rtype: Passage
         """
+        tparse.saveState()
+        word = tparse.eatWord()
+        if word is None:
+            tparse.restoreState()
+            return None
+        if word.lower() == "of":
+            #check for StatutePassage
+            passage = StatutePassage.makeStatutePassage(tparse)
+            if passage is not None:
+                tparse.discardState()
+                return passage
+            pass
+        if word.lower() == "of" or word.lower() == "in":
+            #check for DefinitionPassage
+            passage = DefinitionPassage.makeDefinitionPassage(tparse)
+            if passage is not None:
+                tparse.discardState()
+                return passage
+            passage = LabelPassage.makeLabelPassage(tparse)
+            if passage is not None:
+                tparse.discardState()
+                return passage
+            passage = DescriptionPassage.makeDescriptionPassage(tparse)
+            if passage is not None:
+                tparse.discardState()
+                return passage
+        tparse.restoreState()
         return None
 
     def parseContainer(self,tparse):
         """Find container for this Passage in the tparse, and add it, eating the applicable text.  If no Container found, then nothing added."""
         container = Passage.makeContainerPassage(tparse)
         if container is None: return
-        self.setContainerPassage = container
-
+        self.setContainerPassage(container)
 
     def getContainerPassage(self):
         """
@@ -776,10 +837,15 @@ class Passage(object):
 
 
     def __str__(self):
-        return "<" + self.passageString() + self.getContainerPassage().passageString() + ">"
+        container = self.getContainerPassage()
+        if container is None:
+            cstr = ""
+        else:
+            cstr = " >> " + str(container)
+        return "[" + self.passageString() + cstr + "]"
 
     def passageString(self):
-        return "[Generic Passage]"
+        return "Generic Passage"
 
     pass
 
@@ -815,7 +881,7 @@ class LabelPassage(Passage):
         return
 
     def passageString(self):
-        return "[Label:" + self.labelType.getText() + ":" + ", ".join(c.getText() for c in self.labelList) + "]"
+        return "Label:" + self.labelType.getText() + ":" + ", ".join(c.getText() for c in self.labelList) + ""
     pass
 
 class StatutePassage(Passage):
@@ -846,7 +912,7 @@ class StatutePassage(Passage):
         return self
 
     def passageString(self):
-        return "[Statute: " + self.statuteName + "]"
+        return "Statute: " + self.statuteName + ""
 
 class DefinitionPassage(Passage):
     @staticmethod
@@ -856,13 +922,14 @@ class DefinitionPassage(Passage):
         @type tparse: TextParse
         @rtype: DefinitionPassage
         """
+        #TODO: fix so that can handle list of definitions, as in 66(16) (should be able to factor things out to have a single methods that parses a list of labels/variables/definitions?)
         tparse.saveState()
         w= tparse.eatWord()
-        if w.lower() != "the":
+        if w is None or w.lower() != "the":
             tparse.restoreState()
             return None
         w = tparse.eatWord()
-        if w.lower() != "definition":
+        if w is None or w.lower() != "definition":
             tparse.restoreState()
             return None
         qfrag = tparse.eatQuoteText()
@@ -884,7 +951,7 @@ class DefinitionPassage(Passage):
         self.definedTerm = self.definitionFragment.getText().lower()
         return
     def passageString(self):
-        return "[Defintion: \"" + self.definedTerm + "\"]"
+        return "Definition: \"" + self.definedTerm + "\""
 
 class DescriptionPassage(Passage):
     @staticmethod
@@ -894,10 +961,8 @@ class DescriptionPassage(Passage):
         @type tparse: TextParse
         @rtype: DescriptionPassage
         """
-
         vlist = tparse.eatVariableList()
         if vlist is None: return None
-
         dp = DescriptionPassage(decoratedText=tparse.getDecoratedText(),varFragList=vlist)
         dp.parseContainer(tparse)
         return dp
@@ -906,12 +971,12 @@ class DescriptionPassage(Passage):
         @type decoratedText: DecoratedText.DecoratedText
         @type varFragList: list of Fragment
         """
-        Passage.__init__(self,decoratedText,varFragList)
+        Passage.__init__(self,decoratedText)
         self.variableFragments = varFragList
         self.variables = [c.getText() for c in self.variableFragments]
         return
     def passageString(self):
-        return "[Variables: " + ", ".join(self.variables) + "]"
+        return "Variables: " + ", ".join(self.variables) + ""
 
 
 class SectionReferenceParse(TextParse):
@@ -1064,8 +1129,30 @@ if __name__ == "__main__":
     t = TextParse(s)
     print(t.eatActLocation())
 
+
     st = "paragraph (i), paragraphs 12(1)(o) and 12(1)(z.5), 18(1)(m), 20(1)(v.1) and 29(1)(b) and 29(2)(b), section 55, subsections 69(6) and 69(7) and paragraph 82(1)(b) of this Act and paragraphs 20(1)(gg) and 81(1)(r) and (s) of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,"
     print("\nTest 14:\n[" + st + "]")
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
     t = SectionReferenceParse(s)
     t.showParseData()
+
+    st = "paragraph 82(1)(b) of this Act and paragraphs 20(1)(gg) and 81(1)(r) and (s) of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,"
+    print("\nTest 15:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = TextParse(s)
+    result = LabelPassage.makeLabelPassage(t)
+    print result
+
+    st = "paragraphs 20(1)(gg) and 81(1)(r) and (s) of the definition \"blah blah\" of section 2 of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,"
+    print("\nTest 15:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = TextParse(s)
+    result = LabelPassage.makeLabelPassage(t)
+    print result
+
+    st = "the values of A.2 and B.3 in paragraphs 20(1)(gg) and 81(1)(r) and (s) of the definition \"blah blah\" of section 2 of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,"
+    print("\nTest 16:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = TextParse(s)
+    result = DescriptionPassage.makeDescriptionPassage(t)
+    print result
