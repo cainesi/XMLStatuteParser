@@ -18,10 +18,12 @@
 # X - cross-link references to regulations / act
 # X - Code to add disclaimer footer on each page
 # X - Code for tables of contents for each instrument
+# X - (force definition matches to be a word boundries (possibly with pluralization)
 
+# Finish up the new "Passage" code - requires: updating eatPassageList, so that it marks Passages with followers, adding decorations based on Passages -- modifying definitions passage so that it can handle multiple definitions
+# Clean up code in LangUtil once new code is done.
 # include a way for "Income Tax Regulations" location to be recognized as a citations to regulations from the act, and allow list of cross-references from Act
 # (ongoing) fix various the error reporting of decorators (so we aren't overwhelmed with definition errors)
-# (force definition matches to be a word bountries (possibly with pluralization)
 # handle additional "of" types: Criminal Code, Canada Pension Plan, Income Tax Regulations -- need a systematic method for these...
 
 # store sectionStart/End data in the StatuteData object?

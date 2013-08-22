@@ -308,6 +308,7 @@ class TextParse(object):
         self.eatSpace()
         if con == "to": frag.setToConnected(True)
         return frag
+
     def eatQuoteText(self):
         """Eats passage of text surrounded by quotes.
         @rtype: Fragment
@@ -324,20 +325,20 @@ class TextParse(object):
         """
         @rtype: Fragment
         """
-        m = TextParse.variablePat.match(self.text[self.ptr:])
+        m = TextParse.variablePat.match(self.text, self.ptr)
         if m is None:
             return None
         varFrag = Fragment(text=m.group("variable"),position=self.ptr)
-        self.ptr += m.end()
+        self.ptr = m.end()
         self.eatSpace()
         return varFrag
+
     def eatVariableList(self):
         """Eats a sequence of variables, and returns list of corresponding Fragments.
         @rtype: list of Fragment
         """
-
         self.saveState() #first block eats header for list of variables and initial variable
-        m = TextParse.variableHeaderPat.match(self.ltext[self.ptr:])
+        m = TextParse.variableHeaderPat.match(self.ltext, self.ptr)
         if m is None:
             self.restoreState()
             return None
@@ -606,6 +607,29 @@ class TextParse(object):
         self.ptr = len(self.text)
         return None, None
 
+    passageStartPat = re.compile("(the +definitions?|sections?|subsections?|paragraphs?|clauses?|subclauses?|the descriptions? of|the values? of|determined for)")
+    def eatToNextPassage(self):
+        """Eats text up to the start of the next Passage (starting with a definition, variable or section start)."""
+        m = TextParse.passageStartPat.search(self.ltext,self.ptr)
+        if m is None: return None
+        self.ptr = m.start()
+        return
+
+    def eatAllPassages(self):
+        """Eats and returns all Passages in the text.
+        @rtype: list of Passage
+        """
+        #TODO, need to specially find passages that immediately follow each other, so that we can set the "nextPassage, used for statute lookup."
+        passages = []
+        self.saveState()
+        nextPassage = Passage.makeNextPassage(self)
+        while nextPassage is not None:
+            passages.append(nextPassage)
+            nextPassage = Passage.makeNextPassage(self)
+            pass
+        return passages
+
+
 class ApplicationParse(TextParse):
     #TODO - handle references to non-current Segments
     #TODO - code to add decorators
@@ -750,8 +774,49 @@ class Passage(object):
         """
         self.decoratedText=decoratedText
         self.targetStatute = None
-        self.containerPassage = None
+        self.containerPassage = None #the Passage that says where this passage is located (if any)
+        self.followingPassage = None #the Passage immediately following this one, if any
         return
+
+    @staticmethod
+    def makeNextPassage(tparse):
+        """
+        Advances the text parser to eat the next Passage, if any.
+        @param tparse:
+        @type tparse: TextParse
+        @return:
+        @rtype: Passage
+        """
+        tparse.saveState()
+        tparse.eatToNextPassage()
+        passage = Passage.makePassage(tparse)
+        if passage is None:
+            tparse.restoreState()
+            return None
+        return passage
+
+    @staticmethod
+    def makePassage(tparse):
+        """
+        Attempts to eat a Passage at the current position in the textparser.
+        @type tparse: TextParse
+        @rtype: Passage
+        """
+        tparse.saveState()
+        passage = LabelPassage.makeLabelPassage(tparse)
+        if passage is not None:
+            tparse.discardState()
+            return passage
+        passage = DefinitionPassage.makeDefinitionPassage(tparse)
+        if passage is not None:
+            tparse.discardState()
+            return passage
+        passage = VariablePassage.makeVariablePassage(tparse)
+        if passage is not None:
+            tparse.discardState()
+            return passage
+        tparse.restoreState()
+        return None
 
     @staticmethod
     def makeContainerPassage(tparse):
@@ -761,8 +826,7 @@ class Passage(object):
         tparse.saveState()
         word = tparse.eatWord()
         if word is None:
-            tparse.restoreState()
-            return None
+            word = "" #fill in word with an empty string so that following string comparisons work
         if word.lower() == "of":
             #check for StatutePassage
             passage = StatutePassage.makeStatutePassage(tparse)
@@ -780,12 +844,12 @@ class Passage(object):
             if passage is not None:
                 tparse.discardState()
                 return passage
-            passage = DescriptionPassage.makeDescriptionPassage(tparse)
+            passage = VariablePassage.makeVariablePassage(tparse)
             if passage is not None:
                 tparse.discardState()
                 return passage
         tparse.restoreState()
-        return None
+        return TerminalPassage(tparse.getDecoratedText())
 
     def parseContainer(self,tparse):
         """Find container for this Passage in the tparse, and add it, eating the applicable text.  If no Container found, then nothing added."""
@@ -810,6 +874,27 @@ class Passage(object):
         self.containerPassage = passage
         return
 
+    def getFollowingPassage(self):
+        """
+        @return:
+        @rtype: Passage
+        """
+        return self.followingPassage
+
+    def setFollowingPassage(self,passage):
+        """
+        Sets the following Passage for this Passage.  Information is also stored in all containers.
+        @param passage:
+        @type passage: Passage
+        @return:
+        @rtype:
+        """
+        self.followingPassage = passage
+        if self.containerPassage is not None:
+            self.containerPassage.setFollowingPassage(passage)
+            pass
+        return
+
     def setStatuteName(self,statuteName):
         """
         Sets the name of the Statute for this passage (useful for Passages that do not have a directly containing Statute Passage -- e.g. where Statute is implicitly local.
@@ -821,13 +906,13 @@ class Passage(object):
         #TODO
         return
 
-    def getStatutePassage(self):
+    def getStatute(self):
         """Returns the StatutePassage specifying the Act which this Passage points into, or None if None is specified (i.e., this is a local reference)
-        @rtype: StatutePassage
+        @rtype: str
         """
         if self.containerPassage is None:
-            return None
-        return self.containerPassage.getStatutePassage()
+            raise LangUtilException("Calling generic getStatutePassage on a Passage without a container, which should never happen.")
+        return self.containerPassage.getStatute()
 
     def getLocationSL(self):
         """Returns the SectionLabel that this Passage points into (e.g., when we are talking about a paragraph of a definition)
@@ -884,35 +969,6 @@ class LabelPassage(Passage):
         return "Label:" + self.labelType.getText() + ":" + ", ".join(c.getText() for c in self.labelList) + ""
     pass
 
-class StatutePassage(Passage):
-    @staticmethod
-    def makeStatutePassage(tparse):
-        """
-        Returns StatutePassage at at the current position in tparse, otherwise None. StatutePassage is one referring to an Statute (e.g., the Blah Blah Act(, revised statutes of Canada...)
-        @type tparse: TextParse
-        @rtype: StatutePassage
-        """
-        actName = tparse.n_eatActLocation()
-        if actName is None:
-            return None
-        return StatutePassage(decoratedText=tparse.getDecoratedText(),statuteName=actName)
-
-    def __init__(self,decoratedText,statuteName):
-        """
-        @type decoratedText: DecoratedText.DecoratedText
-        @type statuteName: str
-        """
-        Passage.__init__(self,decoratedText)
-
-        self.statuteName = statuteName
-        self.statuteFragment=None
-        return
-
-    def getStatutePassage(self):
-        return self
-
-    def passageString(self):
-        return "Statute: " + self.statuteName + ""
 
 class DefinitionPassage(Passage):
     @staticmethod
@@ -953,17 +1009,17 @@ class DefinitionPassage(Passage):
     def passageString(self):
         return "Definition: \"" + self.definedTerm + "\""
 
-class DescriptionPassage(Passage):
+class VariablePassage(Passage):
     @staticmethod
-    def makeDescriptionPassage(tparse):
+    def makeVariablePassage(tparse):
         """
         Returns DescriptionPassage at the current position in tparse, otherwise None. DescriptionPassage is a passage referring to one or more variables in a formula (e.g., (the description of|the value of|determined for) A (and|or|to) (G) in (section|subsection etc) or (the definition "...")...
         @type tparse: TextParse
-        @rtype: DescriptionPassage
+        @rtype: VariablePassage
         """
         vlist = tparse.eatVariableList()
         if vlist is None: return None
-        dp = DescriptionPassage(decoratedText=tparse.getDecoratedText(),varFragList=vlist)
+        dp = VariablePassage(decoratedText=tparse.getDecoratedText(),varFragList=vlist)
         dp.parseContainer(tparse)
         return dp
     def __init__(self,decoratedText,varFragList):
@@ -977,6 +1033,62 @@ class DescriptionPassage(Passage):
         return
     def passageString(self):
         return "Variables: " + ", ".join(self.variables) + ""
+
+class StatutePassage(Passage):
+    @staticmethod
+    def makeStatutePassage(tparse):
+        """
+        Returns StatutePassage at at the current position in tparse, otherwise None. StatutePassage is one referring to an Statute (e.g., the Blah Blah Act(, revised statutes of Canada...)
+        @type tparse: TextParse
+        @rtype: StatutePassage
+        """
+        actName = tparse.n_eatActLocation()
+        if actName is None:
+            return None
+        return StatutePassage(decoratedText=tparse.getDecoratedText(),statuteName=actName)
+
+    def __init__(self,decoratedText,statuteName):
+        """
+        @type decoratedText: DecoratedText.DecoratedText
+        @type statuteName: str
+        """
+        Passage.__init__(self,decoratedText)
+
+        self.statuteName = statuteName
+        self.statuteFragment=None
+        return
+
+    def getStatute(self):
+        return self.statuteName
+
+    def passageString(self):
+        return "Statute: " + self.statuteName + ""
+
+class TerminalPassage(StatutePassage):
+    """Passage representing the "Statute" if not Statute is otherwise specified.  Will look to the "next" Passage for the Statute, if specified, otherwise defaults to "LOCAL". """
+    def __init__(self,decoratedText):
+        """
+        @param decoratedText:
+        @type decoratedText: DecoratedText.DecoratedText
+        @return:
+        @rtype:
+        """
+        Passage.__init__(self,decoratedText)
+        return
+
+    def getStatute(self):
+        """
+        This Passage type occurs where there is not a terminating Statute Passage.  It looks to the following Passage for teh Statute and otherwise indicated local.
+        @return:
+        @rtype: str
+        """
+        follower = self.getFollowingPassage()
+        if follower is None:
+            return "LOCAL"
+        return follower.getStatute()
+
+    def passageString(self):
+        return "Terminal:hasFollower=" + ("True" if (self.getFollowingPassage() is not None) else "False")
 
 
 class SectionReferenceParse(TextParse):
@@ -1009,10 +1121,13 @@ class SectionReferenceParse(TextParse):
             loc, labList = self.eatNextLabelSeries()
             pass
         return
+
     def addDecorators(self):
         """Add decorators to the underlying DecoratedText for the labels identified by the parser."""
-        #TODO - extend to non-local references (will need code in StatuteData to redirect to correct data object).  - So far implemented for references to the "Act" from regulations
-        if len(self.sectionDict)  == 0: return
+
+        #TODO - extend to non-local references (will need code in StatuteData to redirect to correct data object).- So far implemented for references to the "Act" from regulations
+        if len(self.sectionDict) == 0:
+            return
         statData = self.decoratedText.getStatute().getStatuteData()
         for actName in self.sectionDict:
             if actName == "LOCAL": #add decorators for local references
@@ -1037,8 +1152,8 @@ class SectionReferenceParse(TextParse):
                 #TODO: fill this in, cross-references to all other statutes
                 pass
             pass
-
         return
+
     def showParseData(self):
         for loc in self.sectionDict:
             locstr = loc
@@ -1153,6 +1268,13 @@ if __name__ == "__main__":
     st = "the values of A.2 and B.3 in paragraphs 20(1)(gg) and 81(1)(r) and (s) of the definition \"blah blah\" of section 2 of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952,"
     print("\nTest 16:\n[" + st + "]")
     s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
-    t = TextParse(s)
-    result = DescriptionPassage.makeDescriptionPassage(t)
+    to = TextParse(s)
+    result = VariablePassage.makeVariablePassage(to)
     print result
+
+    st = "blah blah the values of A.2 and B.3 in paragraphs 20(1)(gg) and 81(1)(r) and (s) of the definition \"blah blah\" of section 2 of the Income Tax Act, chapter 148 of the Revised Statutes of Canada, 1952 and paragraph 82(1)(b) of this Act and paragraphs 20(1)(gg) and 81(1)(r) and (s) of the Happy Camper Act; subsection 14(2)"
+    print("\nTest 17:\n[" + st + "]")
+    s = DecoratedText.DecoratedText(parent=Statute.DummyStatute(),text=st)
+    t = TextParse(s)
+    result = t.eatAllPassages()
+    for c in result: print c
