@@ -1,10 +1,24 @@
-#$Id$
+# Copyright (C) 2022  Ian Caines
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 
 import HTMLParser, re
 import xsutil #code to interfact with external C-code library
 from ErrorReporter import showError
 
-#The module provides code that converts an xml file representing a statute (as found in the Justice Department website) and creates an in-memory represenation of it that can be taken as input by the statute parsing code in the Statute module.
+#The module provides code that converts an xml file representing a statute (as found in the Justice Department website) and creates an in-memory representation of it that can be taken as input by the statute parsing code in the Statute module.
 
 # HACK -- the HTMLParser isn't really a xml parser (most notably, not case sensitive) -- should update this to use xml.parsers.expat
 
